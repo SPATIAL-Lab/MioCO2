@@ -216,3 +216,69 @@ parseStan = function(d, condense = TRUE, fixA = FALSE){
   
   return(data)
 }
+
+# Add time series to plot w 2 prob density envelopes
+tsdens = function(d, col = "black"){
+  # Check dimensions of d
+  if(ncol(d) != 6){stop("d cols should be should be time, 5%, 25%, 50%, 75%, 95% CI")}
+  
+  base.rgb = col2rgb(col)
+  cols = c(rgb(base.rgb[1]/255, base.rgb[2]/255, base.rgb[3]/255, alpha = 0.25), 
+           rgb(base.rgb[1]/255, base.rgb[2]/255, base.rgb[3]/255, alpha = 0.25),
+           rgb(base.rgb[1]/255, base.rgb[2]/255, base.rgb[3]/255, alpha = 1))
+  
+  polygon(c(d[, 1], rev(d[, 1])), c(d[, 2], rev(d[, 6])), 
+          col = cols[1], border = NA)
+  polygon(c(d[, 1], rev(d[, 1])), c(d[, 3], rev(d[, 5])), 
+          col = cols[2], border = NA)
+  lines(d[, 1], d[, 4], col = cols[3], lwd = 2)
+}
+
+# Make probability envelope plot
+tsplot = function(a, d, v, col = "black"){
+  if(!inherits(d, "rjags")){
+    stop("d must be rjags object")
+  }
+  d = d$BUGSoutput$sims.list
+  
+  if(!(v %in% names(d))){
+    stop("v not a valid parameter")
+  }
+  d = d[[v]]
+  
+  if(length(a) != ncol(d)){
+    stop("dimension mismatch")
+  }
+  d = apply(d, 2, quantile, probs = c(0.025, 0.25, 0.5, 0.75, 0.975))
+  
+  d = cbind(a, t(d))
+  
+  xlim = range(d[, 1])
+  ylim = range(d[, 2:6])
+  plot(0, 0, type = "n", xlim = rev(xlim), ylim = ylim, xlab = "Age (Mya)",
+       ylab = v)
+  
+  tsdens(d, col)
+}
+
+# Add point estimates to plot
+pointplot = function(a, d, v, col = "black"){
+  if(!inherits(d, "rjags")){
+    stop("d must be rjags object")
+  }
+  d = d$BUGSoutput$sims.list
+  
+  if(!(v %in% names(d))){
+    stop("v not a valid parameter")
+  }
+  d = d[[v]]
+  
+  d = t(apply(d, 2, quantile, probs = c(0.025, 0.5, 0.975)))
+  
+  if(length(a) != nrow(d)){
+    stop("dimension mismatch")
+  }
+  
+  arrows(a, d[, 1], a, d[, 3], 0.05, 90, 3, col)
+  points(a, d[, 2], pch = 21, col = col, bg = "white")
+}
