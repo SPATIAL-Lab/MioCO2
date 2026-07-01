@@ -42,7 +42,7 @@ pd.s.l$d13Ca.obs = data.frame("d13Ca.m" = d13Ca$d13Ca_50[round(pd.s.l$ages * 10,
 
 ## Run it
 ## Parameters to save
-parms = c("pCO2", "d13Ca", "MAT", "MAP")
+parms = c("pCO2", "d13Ca", "MAT", "MAP", "d13Cr", "S_z")
 
 post = jags.parallel(pd.s.l, NULL, parms, "code/models/soil.R", 
                      n.chains = 3, n.iter = 1e5, n.burnin = 1e4, n.thin = 10)
@@ -83,11 +83,11 @@ pd.s.l$dt = stepsize
 pd.s.l$nstep = length(ages)
 
 parms = c("pCO2", "d13Ca", "MAT", "MAP", "PCQ_to", "PCQ_pf", "tsc",
-          "f_R", "pore", "D13Cr")
+          "f_R", "pore", "d13Cr", "S_z")
 
 ## Run it
 post.ts = jags.parallel(pd.s.l, NULL, parms, "code/models/soil_ts.R", 
-                        n.chains = 3, n.iter = 1e3, n.burnin = 1e2)
+                        n.chains = 3, n.iter = 5e3, n.burnin = 1e3)
 
 View(post.ts$BUGSoutput$summary)
 
@@ -100,7 +100,15 @@ points(d13Ca$age, d13Ca$d13Ca_50)
 tsplot(ages, post.ts, "MAP")
 tsplot(ages, post.ts, "PCQ_to")
 tsplot(ages, post.ts, "PCQ_pf")
+tsplot(ages, post.ts, "tsc")
+tsplot(ages, post.ts, "f_R")
 tsplot(ages, post.ts, "pore")
+tsplot(pd.s$age_mean, post.ts, "S_z")
+tsplot(pd.s$age_mean, post.ts, "d13Cr")
+points(pd.s$age_mean, pd.s$d13Com_occluded)
+plot(pd.s.l$d13Cc.obs$d13C_cc - pd.s.l$d13Co.obs$d13Com_occluded, 
+     post.ts$BUGSoutput$median$pCO2[pd.s.l$ai])
+
 
 # Current data structure
 ## datum

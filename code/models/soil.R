@@ -119,7 +119,13 @@ model{
     S_z[i] = S_z_mol[i] * (0.08206 * Tsoil.K[i] * 10^9) # ppmv
 
     ### d13C of soil-respired CO2
-    d13Cr[i] = d13Ca[ai[i]] + D13Cr[ai[i]]
+    DD13_water[i] = 25.09 - 1.2 * (MAP[ai[i]] + 975) / 
+      (27.2 + 0.04 * (MAP[ai[i]] + 975))
+    D13C_plant[i] = (28.26 * 0.22 * (pCO2[ai[i]] + 23.9)) / 
+      (28.26 + 0.22 * (pCO2[ai[i]] + 23.9)) - DD13_water[i] # schubert & Jahren (2015)
+    D13C_off[i] ~ dnorm(0, 1 / 2 ^ 2) # Noise term
+    d13Cr[i] = d13Ca[ai[i]] - D13C_plant[i] + D13C_off[i]
+#    d13Cr[i] = d13Ca[ai[i]] + D13Cr[ai[i]]
     d13Co[i] = d13Cr[i] + SOM.frac[si[i]]
     
     ### d13C of pedogenic carbonate
@@ -185,7 +191,7 @@ model{
     MAT[i] ~ dunif(4, 25) # mean annual temperature
     PCQ_to[i] ~ dunif(5, 20)
     MAP[i] ~ dunif(1e2, 1e3) # mean annual precipitation, mm
-    PCQ_pf[i] ~ dunif(0.3, 1) # PCQ precipitation fraction
+    PCQ_pf[i] ~ dunif(0.02, 0.25) # PCQ precipitation fraction
     
     ## Secondary soil ----
     tsc[i] ~ dunif(0, 0.5)
@@ -193,14 +199,14 @@ model{
 #    ETR[i] ~ dbeta(0.06 * 1e3 / 0.94, 1e3) # Soil evaporation / AET
 #    spre[i] ~ dbeta(27, 22)
     pore[i] ~ dunif(0.45, 0.54) # soil porosity
-    D13Cr[i] ~ dunif(-22, -10) # photosynthetic discrimination
+#    D13Cr[i] ~ dunif(-22, -10) # photosynthetic discrimination
   }
 
   # Global time-dependent ----  
   for(i in 1:length(ages)){
     ## Primary environmental ----
     pCO2[i] = ca.s[i] * 1e3
-    ca.s[i] ~ dunif(0.1, 1)
+    ca.s[i] ~ dunif(0.1, 2)
     d13Ca[i] ~ dunif(-8, -3)
   }
   
