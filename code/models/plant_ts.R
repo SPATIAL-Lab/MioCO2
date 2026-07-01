@@ -1,4 +1,9 @@
 model {
+
+  # Atmosphere
+  for(i in 1:nstep){
+    d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
+  }
   
   # Adaxial species --- how to deal with zero length???
   for(i in ind.ad){
@@ -16,24 +21,24 @@ model {
     s1.beta[i] = s1[i, 1] / s1[i, 2] ^ 2
     
     # Franks model
-    d13C_m[i] = d13Ca_m[level[i]] - D13C[i]
-    D13C[i] = a + (b - a) * ci[i] / ca[level[i]]
-    ci[i] = ca[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
+    d13C_m[i] = d13Ca[level[i]] - D13C[i]
+    D13C[i] = a + (b - a) * ci[i] / pCO2[level[i]]
+    ci[i] = pCO2[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
     
     ## Based on data I've seen A should have noise added
     A[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
     
     q.a[i] = 1 / gcop[i] * (Ci0_m[genus[i]] - gamma)
-    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + ca[level[i]] - 
+    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + pCO2[level[i]] - 
                               1 / meso.scale[genus[i]] - 
                            2 * Ci0_m[genus[i]] + 2 * gamma) + 
-      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - ca[level[i]] + 
+      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - pCO2[level[i]] + 
                              1 / meso.scale[genus[i]])
-    q.c[i] = A0_m[genus[i]] * (gamma * (2 * ca[level[i]] - 
+    q.c[i] = A0_m[genus[i]] * (gamma * (2 * pCO2[level[i]] - 
                                                      2 / meso.scale[genus[i]] - 
                                                Ci0_m[genus[i]] - 2 * gamma) +
                                    Ci0_m[genus[i]] * 
-                                     (ca[level[i]] - 1 / meso.scale[genus[i]]))
+                                     (pCO2[level[i]] - 1 / meso.scale[genus[i]]))
     
     # Stomatal conductance ----
     # Individual level
@@ -89,24 +94,24 @@ model {
     s1.beta[i] = s1[i, 1] / s1[i, 2] ^ 2
     
     # Franks model
-    d13C_m[i] = d13Ca_m[level[i]] - D13C[i]
-    D13C[i] = a + (b - a) * ci[i] / ca[level[i]]
-    ci[i] = ca[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
+    d13C_m[i] = d13Ca[level[i]] - D13C[i]
+    D13C[i] = a + (b - a) * ci[i] / pCO2[level[i]]
+    ci[i] = pCO2[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
     
     ## Based on data I've seen A should have noise added
     A[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
     
     q.a[i] = 1 / gcop[i] * (Ci0_m[genus[i]] - gamma)
-    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + ca[level[i]] - 
+    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + pCO2[level[i]] - 
                               1 / meso.scale[genus[i]] - 
                               2 * Ci0_m[genus[i]] + 2 * gamma) + 
-      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - ca[level[i]] + 
+      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - pCO2[level[i]] + 
                              1 / meso.scale[genus[i]])
-    q.c[i] = A0_m[genus[i]] * (gamma * (2 * ca[level[i]] - 
+    q.c[i] = A0_m[genus[i]] * (gamma * (2 * pCO2[level[i]] - 
                                                      2 / meso.scale[genus[i]] - 
                                                      Ci0_m[genus[i]] - 2 * gamma) +
                                       Ci0_m[genus[i]] * 
-                                      (ca[level[i]] - 1 / meso.scale[genus[i]]))
+                                      (pCO2[level[i]] - 1 / meso.scale[genus[i]]))
     
     # Stomatal conductance ----
     # Individual level
@@ -156,23 +161,32 @@ model {
     gb.beta[i] = gb[i, 1] / gb[i, 2] ^ 2
   }
 
-  # Environmental model ----
+  # Global time-dependent ----  
   for(i in 2:nstep){
-    ca[i] = ca[i - 1] + ca.eps[i]
-    ca.eps[i] ~ dnorm(ca.eps[i - 1] * (ca.phi ^ dt), ca.pc[i])
-    ca.pc[i] = ca.tau * ((1 - ca.phi ^ 2) / (1 - ca.phi ^ (2 * dt)))
+    ## Primary environmental ----
+    pCO2[i] = pCO2[i - 1] + pCO2.eps[i]
+    pCO2.eps[i] ~ dnorm(pCO2.eps[i - 1] * (pCO2.phi ^ dt), pCO2.pc[i])
+    pCO2.pc[i] = pCO2.tau * ((1 - pCO2.phi ^ 2) / (1 - pCO2.phi ^ (2 * dt)))
     
-    d13Ca_m[i] ~ dnorm(d13Ca[i, 1], 1 / d13Ca[i, 2] ^ 2)
+    d13Ca[i] = d13Ca[i - 1] + d13Ca.eps[i]
+    d13Ca.eps[i] ~ dnorm(d13Ca.eps[i - 1] * (d13Ca.phi ^ dt), d13Ca.pc[i])
+    d13Ca.pc[i] = d13Ca.tau * ((1 - d13Ca.phi ^ 2) / (1 - d13Ca.phi ^ (2 * dt)))
   }
   
   ## Initial conditions
-  ca.eps[1] = 0
-  ca[1] = ca.s * 1e3
-  ca.s ~ dunif(0.1, 1)
+  pCO2.eps[1] = 0
+  pCO2[1] = pCO2.s * 1e3
+  pCO2.s ~ dunif(0.3, 0.5)
+  
+  d13Ca.eps[1] = 0
+  d13Ca[1] ~ dunif(-8, -3)
   
   ## Priors
-  ca.phi ~ dbeta(5, 2)
-  ca.tau ~ dgamma(1, 0.2)
+  pCO2.tau ~ dgamma(5, 1e3) 
+  pCO2.phi ~ dbeta(5, 2)
+  
+  d13Ca.phi ~ dbeta(5, 2)
+  d13Ca.tau ~ dgamma(5, 1e-2)
   
   # Constants ----
   pi = 3.14159265

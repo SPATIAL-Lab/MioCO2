@@ -1,4 +1,9 @@
 model {
+ 
+  # Atmosphere
+  for(i in 1:length(d13Ca.obs[, 1])){
+    d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
+  }
   
   # Adaxial species --- how to deal with zero length???
   for(i in ind.ad){
@@ -16,24 +21,24 @@ model {
     s1.beta[i] = s1[i, 1] / s1[i, 2] ^ 2
     
     # Franks model
-    d13C_m[i] = d13Ca_m[level[i]] - D13C[i]
-    D13C[i] = a + (b - a) * ci[i] / ca[level[i]]
-    ci[i] = ca[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
+    d13C_m[i] = d13Ca[level[i]] - D13C[i]
+    D13C[i] = a + (b - a) * ci[i] / pCO2[level[i]]
+    ci[i] = pCO2[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
     
     ## Based on data I've seen A should have noise added
     A[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
     
     q.a[i] = 1 / gcop[i] * (Ci0_m[genus[i]] - gamma)
-    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + ca[level[i]] - 
+    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + pCO2[level[i]] - 
                               1 / meso.scale[genus[i]] - 
                            2 * Ci0_m[genus[i]] + 2 * gamma) + 
-      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - ca[level[i]] + 
+      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - pCO2[level[i]] + 
                              1 / meso.scale[genus[i]])
-    q.c[i] = A0_m[genus[i]] * (gamma * (2 * ca[level[i]] - 
+    q.c[i] = A0_m[genus[i]] * (gamma * (2 * pCO2[level[i]] - 
                                                      2 / meso.scale[genus[i]] - 
                                                Ci0_m[genus[i]] - 2 * gamma) +
                                    Ci0_m[genus[i]] * 
-                                     (ca[level[i]] - 1 / meso.scale[genus[i]]))
+                                     (pCO2[level[i]] - 1 / meso.scale[genus[i]]))
     
     # Stomatal conductance ----
     # Individual level
@@ -89,24 +94,24 @@ model {
     s1.beta[i] = s1[i, 1] / s1[i, 2] ^ 2
     
     # Franks model
-    d13C_m[i] = d13Ca_m[level[i]] - D13C[i]
-    D13C[i] = a + (b - a) * ci[i] / ca[level[i]]
-    ci[i] = ca[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
+    d13C_m[i] = d13Ca[level[i]] - D13C[i]
+    D13C[i] = a + (b - a) * ci[i] / pCO2[level[i]]
+    ci[i] = pCO2[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
     
     ## Based on data I've seen A should have noise added
     A[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
     
     q.a[i] = 1 / gcop[i] * (Ci0_m[genus[i]] - gamma)
-    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + ca[level[i]] - 
+    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + pCO2[level[i]] - 
                               1 / meso.scale[genus[i]] - 
                               2 * Ci0_m[genus[i]] + 2 * gamma) + 
-      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - ca[level[i]] + 
+      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - pCO2[level[i]] + 
                              1 / meso.scale[genus[i]])
-    q.c[i] = A0_m[genus[i]] * (gamma * (2 * ca[level[i]] - 
+    q.c[i] = A0_m[genus[i]] * (gamma * (2 * pCO2[level[i]] - 
                                                      2 / meso.scale[genus[i]] - 
                                                      Ci0_m[genus[i]] - 2 * gamma) +
                                       Ci0_m[genus[i]] * 
-                                      (ca[level[i]] - 1 / meso.scale[genus[i]]))
+                                      (pCO2[level[i]] - 1 / meso.scale[genus[i]]))
     
     # Stomatal conductance ----
     # Individual level
@@ -157,10 +162,10 @@ model {
   }
 
   # Locality priors ----
-  for(i in 1:length(d13Ca[, 1])){
-    ca[i] = ca.s[i] * 1e3
-    ca.s[i] ~ dunif(0.1, 8)
-    d13Ca_m[i] ~ dnorm(d13Ca[i, 1], 1 / d13Ca[i, 2] ^ 2)
+  for(i in 1:length(d13Ca.obs[, 1])){
+    pCO2[i] = pCO2.s[i] * 1e3
+    pCO2.s[i] ~ dunif(0.1, 2)
+    d13Ca[i] ~ dunif(-8, -3)
   }
   
   # Constants ----

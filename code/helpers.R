@@ -19,7 +19,7 @@ parseFranks = function(d, condense = TRUE, fixA = FALSE){
   }
   
   # Free parameters
-  mp.names = c("d13Ca", "A0", "CiCa0", "gb", "s1", "s2", "s3",
+  mp.names = c("d13Ca.obs", "A0", "CiCa0", "gb", "s1", "s2", "s3",
                "s4", "s5")
   mp.sd = c(0.5, 0.25, 0.05, 0.05, 0.001, 0.05, 0.01, 0.01, 0.001)
   
@@ -76,7 +76,7 @@ parseFranks = function(d, condense = TRUE, fixA = FALSE){
     ## Condense site level parameters
     ### First occurrence of each strat level
     fo = match(strats, d[, ci])
-    data$d13Ca = data$d13Ca[fo, ]
+    data$d13Ca.obs = data$d13Ca.obs[fo, ]
     
     ## Taxa index
     ### Collect unknowns and assign dummy names to them
