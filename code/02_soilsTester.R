@@ -37,8 +37,8 @@ d13Ca = read.csv("data/d13Ca_Cenozoic.csv")
 d13Ca$sd = (d13Ca$d13Ca_97p5 - d13Ca$d13Ca_2p5) / 2
 
 ## Age index in 100kyr bins
-pd.s.l$d13Ca.obs = data.frame("d13Ca.m" = d13Ca$d13Ca_50[round(data$ages * 10, 0)],
-                            "d13Ca.sd" = d13Ca$sd[round(data$ages * 10, 0)])
+pd.s.l$d13Ca.obs = data.frame("d13Ca.m" = d13Ca$d13Ca_50[round(pd.s.l$ages * 10, 0)],
+                            "d13Ca.sd" = d13Ca$sd[round(pd.s.l$ages * 10, 0)])
 
 ## Run it
 ## Parameters to save
@@ -82,15 +82,25 @@ for(i in seq_along(pd.s$age_mean)){
 pd.s.l$dt = stepsize
 pd.s.l$nstep = length(ages)
 
+parms = c("pCO2", "d13Ca", "MAT", "MAP", "PCQ_to", "PCQ_pf", "tsc",
+          "f_R", "pore", "D13Cr")
+
 ## Run it
 post.ts = jags.parallel(pd.s.l, NULL, parms, "code/models/soil_ts.R", 
-                        n.chains = 3, n.iter = 1e5, n.burnin = 1e4, n.thin = 10)
-
-
+                        n.chains = 3, n.iter = 1e3, n.burnin = 1e2)
 
 View(post.ts$BUGSoutput$summary)
+
 tsplot(ages, post.ts, "pCO2")
 pointplot(pd.s$age_mean, post, "pCO2")
+tsplot(ages, post.ts, "MAT")
+points(pd.s$age_mean, pd.s$tempC)
+tsplot(ages, post.ts, "d13Ca")
+points(d13Ca$age, d13Ca$d13Ca_50)
+tsplot(ages, post.ts, "MAP")
+tsplot(ages, post.ts, "PCQ_to")
+tsplot(ages, post.ts, "PCQ_pf")
+tsplot(ages, post.ts, "pore")
 
 # Current data structure
 ## datum

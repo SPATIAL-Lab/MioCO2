@@ -194,9 +194,10 @@ model{
     MAP.eps[i] ~ dnorm(MAP.eps[i - 1] * (MAP.phi ^ dt), MAP.pc[i])T(-0.99,)
     MAP.pc[i] = MAP.tau * ((1 - MAP.phi ^ 2) / (1 - MAP.phi ^ (2 * dt)))
     
-    PCQ_pf[i] = PCQ_pf[i - 1] * (1 + PCQ_pf.eps[i])
-    PCQ_pf.eps[i] ~ dnorm(PCQ_pf.eps[i - 1] * (PCQ_pf.phi ^ dt), PCQ_pf.pc[i])
-    PCQ_pf.pc[i] = PCQ_pf.tau * ((1 - PCQ_pf.phi ^ 2) / (1 - PCQ_pf.phi ^ (2 * dt)))
+    PCQ_pf[i] ~ dbeta(PCQ_pf[i - 1] * PCQ_pf.v, (1 - PCQ_pf[i - 1]) * PCQ_pf.v)
+#    PCQ_pf[i] = PCQ_pf[i - 1] * (1 + PCQ_pf.eps[i])
+#    PCQ_pf.eps[i] ~ dnorm(PCQ_pf.eps[i - 1] * (PCQ_pf.phi ^ dt), PCQ_pf.pc[i])
+#    PCQ_pf.pc[i] = PCQ_pf.tau * ((1 - PCQ_pf.phi ^ 2) / (1 - PCQ_pf.phi ^ (2 * dt)))
 
     ## Secondary soil ----
     tsc[i] = tsc[i - 1] + tsc.eps[i]
@@ -220,7 +221,7 @@ model{
   }
 
   ## Initial conditions
-  MAT[1] ~ dunif(4, 17) # terrestrial temperature, C
+  MAT[1] ~ dunif(15, 25) # terrestrial temperature, C
   MAT.eps[1] = 0
   
   PCQ_to[1] ~ dunif(7, 15) # PCQ temperature offset, C
@@ -230,7 +231,7 @@ model{
   MAP.eps[1] = 0
   
   PCQ_pf[1] ~ dunif(0.3, 1) # PCQ precipitation fraction
-  PCQ_pf.eps[1] = 0
+#  PCQ_pf.eps[1] = 0
   
   tsc[1] ~ dunif(0, 0.5) # seasonal offset of PCQ for thermal diffusion
   tsc.eps[1] = 0
@@ -251,22 +252,22 @@ model{
   PCQ_to.tau ~ dgamma(10, 1)
   PCQ_to.phi ~ dbeta(2, 5)
   
-  MAP.tau ~ dgamma(10, 1) # percentage
+  MAP.tau ~ dgamma(10, 1e-2) # percentage
   MAP.phi ~ dbeta(2, 5)
   
-  PCQ_pf.tau ~ dgamma(10, 1e-1) # percentage
-  PCQ_pf.phi ~ dbeta(2, 5)
+  PCQ_pf.v ~ dgamma(10, 1e-5) # percentage
+  #PCQ_pf.phi ~ dbeta(2, 5)
   
   tsc.tau ~ dgamma(10, 1e-6)
   tsc.phi ~ dbeta(2, 5)
   
   f_R.tau ~ dgamma(10, 1e-4) # percentage
   f_R.phi ~ dbeta(2, 5)
-  
-  pore.tau ~ dgamma(10, 1e-7) # was 1e-2
+
+  pore.tau ~ dgamma(1, 1e-7) # was 1e-2
   pore.phi ~ dbeta(2, 5)
   
-  D13Cr.tau ~ dgamma(10, 10)
+  D13Cr.tau ~ dgamma(1, 1e-2)
   D13Cr.phi ~ dbeta(5, 2)
   
   # Global time-dependent ----  
@@ -290,11 +291,11 @@ model{
   d13Ca[1] ~ dunif(-8, -3)
   
   ## Priors
-  pCO2.phi ~ dbeta(5, 2)
-  pCO2.tau ~ dgamma(1, 0.2)
+  pCO2.tau ~ dgamma(10, 1e3) 
+  pCO2.phi ~ dbeta(2, 5)
   
   d13Ca.phi ~ dbeta(5, 2)
-  d13Ca.tau ~ dgamma(1, 20)
+  d13Ca.tau ~ dgamma(5, 1e-2)
   
   # Site dependent ----
   for(i in 1:length(sites)){
