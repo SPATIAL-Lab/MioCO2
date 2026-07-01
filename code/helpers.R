@@ -282,3 +282,68 @@ pointplot = function(a, d, v, col = "black"){
   arrows(a, d[, 1], a, d[, 3], 0.05, 90, 3, col)
   points(a, d[, 2], pch = 21, col = col, bg = "white")
 }
+
+parseSoil = function(d, condense = TRUE){
+  # Parse values from sheet, obs, parameters, constants
+  
+  # Current data structure
+  ## datum
+  ## soil
+  
+  # Long-term solution
+  ## datum
+  ## soil
+  ## age
+  ## site
+  
+  data = list()
+  
+  # d13Cc
+  ci = match("d13C_cc", names(d))
+  d.sub = d[, ci:(ci + 1)]
+  d.sub[, 2] = d.sub[, 2] / 2
+  data$d13Cc.obs = d.sub
+
+  # d13Co
+  ## Need to accommodate other OM types
+  ci = match("d13Com_occluded", names(d))
+  d.sub = d[, ci:(ci + 1)]
+  d.sub[, 2] = d.sub[, 2] / 2
+  data$d13Co.obs = d.sub
+  
+  # MAT
+  ci = match("tempC", names(d))
+  d.sub = d[, ci:(ci + 1)]
+  d.sub[, 2] = d.sub[, 2] / 2
+  data$MAT.obs = d.sub
+  
+  # MAP
+#  ci = match("d13C_cc", names(d))
+#  d.sub = d[, ci:(ci + 1)]
+#  d.sub[, 2] = d.sub[, 2] / 2
+#  data$MAP.obs = d.sub
+
+  # lat
+  data$lat = d$lat
+  
+  # age index
+  data$ai = d$ai
+  
+  # site index
+  data$si = d$si
+  
+  # number of data
+  data$nd = nrow(d)
+  
+  # Condense sites, add condense ages
+  if(condense){
+    ## Condense site level parameters
+    ### First occurrence of each strat level
+    sites = unique(d$si)
+    fo = match(sites, d$si)
+    data$lat = d$lat[fo]
+    
+  }
+  
+  return(data)
+}

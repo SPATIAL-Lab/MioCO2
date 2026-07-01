@@ -16,12 +16,12 @@ model{
     d13Co.pre[i] = 1 / d13Co.obs[i, 2] ^ 2
   }
   
-  for(i in 1:length(nd)){
+  for(i in 1:nd){
     MAT.obs[i, 1] ~ dnorm(MAT[ai[i]], MAT.pre[i])
     MAT.pre[i] = 1 / MAT.obs[i, 2] ^ 2
   }
   
-  for(i in 1:length(ages)){
+  for(i in 1:nstep){
     d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], d13Ca.pre[i])
     d13Ca.pre[i] = 1 / d13Ca.obs[i, 2] ^ 2
   }
@@ -85,7 +85,7 @@ model{
     AET_var[i] ~ dgamma(1 / 0.2 ^ 2, 1 / 0.2 ^ 2) # noise parameter - Gentine (2012)
     AET_PCQ[i] = PPCQ[i] * (1 / (sqrt(1 + (1 / ((PET_PCQ[i] / (PPCQ[i])) * 
                                                   AET_var[i])) ^ 2)))
-
+    
     ## Average rooting depth
     AI[i] = PET[i] / MAP[ai[i]]
     L[i] = ifelse(AI[i] < 1.4, (-2 * AI[i]^2 + 2.5 * AI[i] + 1) * 100, 60)
@@ -180,29 +180,121 @@ model{
   
   # Site level time-dependent ----
   # here cheating since there's only one record 
-  for(i in 1:length(ages)){
+  for(i in 2:nstep){
     ## Primary ----
-    MAT[i] ~ dunif(4, 25) # mean annual temperature
-    PCQ_to[i] ~ dunif(5, 20)
-    MAP[i] ~ dunif(1e2, 1e3) # mean annual precipitation, mm
-    PCQ_pf[i] ~ dunif(0.3, 1) # PCQ precipitation fraction
+    MAT[i] = MAT[i - 1] + MAT.eps[i]
+    MAT.eps[i] ~ dnorm(MAT.eps[i - 1] * (MAT.phi ^ dt), MAT.pc[i])
+    MAT.pc[i] = MAT.tau * ((1 - MAT.phi ^ 2) / (1 - MAT.phi ^ (2 * dt)))
     
+    PCQ_to[i] = PCQ_to[i - 1] + PCQ_to.eps[i]
+    PCQ_to.eps[i] ~ dnorm(PCQ_to.eps[i - 1] * (PCQ_to.phi ^ dt), PCQ_to.pc[i])
+    PCQ_to.pc[i] = PCQ_to.tau * ((1 - PCQ_to.phi ^ 2) / (1 - PCQ_to.phi ^ (2 * dt)))
+    
+    MAP[i] = MAP[i - 1] * (1 + MAP.eps[i])
+    MAP.eps[i] ~ dnorm(MAP.eps[i - 1] * (MAP.phi ^ dt), MAP.pc[i])T(-0.99,)
+    MAP.pc[i] = MAP.tau * ((1 - MAP.phi ^ 2) / (1 - MAP.phi ^ (2 * dt)))
+    
+    PCQ_pf[i] = PCQ_pf[i - 1] * (1 + PCQ_pf.eps[i])
+    PCQ_pf.eps[i] ~ dnorm(PCQ_pf.eps[i - 1] * (PCQ_pf.phi ^ dt), PCQ_pf.pc[i])
+    PCQ_pf.pc[i] = PCQ_pf.tau * ((1 - PCQ_pf.phi ^ 2) / (1 - PCQ_pf.phi ^ (2 * dt)))
+
     ## Secondary soil ----
-    tsc[i] ~ dunif(0, 0.5)
-    f_R[i] ~ dbeta(2, 16) # ratio of PCQ to mean annual respiration rate
+    tsc[i] = tsc[i - 1] + tsc.eps[i]
+    tsc.eps[i] ~ dnorm(tsc.eps[i - 1] * (tsc.phi ^ dt), tsc.pc[i])
+    tsc.pc[i] = tsc.tau * ((1 - tsc.phi ^ 2) / (1 - tsc.phi ^ (2 * dt)))
+
+    f_R[i] = f_R[i - 1] * (1 + f_R.eps[i])
+    f_R.eps[i] ~ dnorm(f_R.eps[i - 1] * (f_R.phi ^ dt), f_R.pc[i])
+    f_R.pc[i] = f_R.tau * ((1 - f_R.phi ^ 2) / (1 - f_R.phi ^ (2 * dt)))
+
 #    ETR[i] ~ dbeta(0.06 * 1e3 / 0.94, 1e3) # Soil evaporation / AET
 #    spre[i] ~ dbeta(27, 22)
-    pore[i] ~ dunif(0.45, 0.54) # soil porosity
-    D13Cr[i] ~ dunif(-22, -10) # photosynthetic discrimination
+    
+    pore[i] = pore[i - 1] + pore.eps[i]
+    pore.eps[i] ~ dnorm(pore.eps[i - 1] * (pore.phi ^ dt), pore.pc[i])
+    pore.pc[i] = pore.tau * ((1 - pore.phi ^ 2) / (1 - pore.phi ^ (2 * dt)))
+    
+    D13Cr[i] = D13Cr[i - 1] + D13Cr.eps[i]
+    D13Cr.eps[i] ~ dnorm(D13Cr.eps[i - 1] * (D13Cr.phi ^ dt), D13Cr.pc[i])
+    D13Cr.pc[i] = D13Cr.tau * ((1 - D13Cr.phi ^ 2) / (1 - D13Cr.phi ^ (2 * dt)))
   }
 
+  ## Initial conditions
+  MAT[1] ~ dunif(4, 17) # terrestrial temperature, C
+  MAT.eps[1] = 0
+  
+  PCQ_to[1] ~ dunif(7, 15) # PCQ temperature offset, C
+  PCQ_to.eps[1] = 0
+  
+  MAP[1] ~ dunif(1e2, 1e3) # mean annual precipitation, mm
+  MAP.eps[1] = 0
+  
+  PCQ_pf[1] ~ dunif(0.3, 1) # PCQ precipitation fraction
+  PCQ_pf.eps[1] = 0
+  
+  tsc[1] ~ dunif(0, 0.5) # seasonal offset of PCQ for thermal diffusion
+  tsc.eps[1] = 0
+  
+  f_R[1] ~ dbeta(2, 16) # ratio of PCQ to mean annual respiration rate
+  f_R.eps[1] = 0
+  
+  pore[1] ~ dunif(0.45, 0.54) # soil porosity
+  pore.eps[1] = 0
+  
+  D13Cr[1] ~ dunif(-22, -10)
+  D13Cr.eps[1] = 0
+  
+  ## Priors
+  MAT.tau ~ dgamma(10, 1)
+  MAT.phi ~ dbeta(2, 5)
+  
+  PCQ_to.tau ~ dgamma(10, 1)
+  PCQ_to.phi ~ dbeta(2, 5)
+  
+  MAP.tau ~ dgamma(10, 1) # percentage
+  MAP.phi ~ dbeta(2, 5)
+  
+  PCQ_pf.tau ~ dgamma(10, 1e-1) # percentage
+  PCQ_pf.phi ~ dbeta(2, 5)
+  
+  tsc.tau ~ dgamma(10, 1e-6)
+  tsc.phi ~ dbeta(2, 5)
+  
+  f_R.tau ~ dgamma(10, 1e-4) # percentage
+  f_R.phi ~ dbeta(2, 5)
+  
+  pore.tau ~ dgamma(10, 1e-7) # was 1e-2
+  pore.phi ~ dbeta(2, 5)
+  
+  D13Cr.tau ~ dgamma(10, 10)
+  D13Cr.phi ~ dbeta(5, 2)
+  
   # Global time-dependent ----  
-  for(i in 1:length(ages)){
+  for(i in 2:nstep){
     ## Primary environmental ----
-    pCO2[i] = ca.s[i] * 1e3
-    ca.s[i] ~ dunif(0.1, 1)
-    d13Ca[i] ~ dunif(-8, -3)
+    pCO2[i] = pCO2[i - 1] + pCO2.eps[i]
+    pCO2.eps[i] ~ dnorm(pCO2.eps[i - 1] * (pCO2.phi ^ dt), pCO2.pc[i])
+    pCO2.pc[i] = pCO2.tau * ((1 - pCO2.phi ^ 2) / (1 - pCO2.phi ^ (2 * dt)))
+
+    d13Ca[i] = d13Ca[i - 1] + d13Ca.eps[i]
+    d13Ca.eps[i] ~ dnorm(d13Ca.eps[i - 1] * (d13Ca.phi ^ dt), d13Ca.pc[i])
+    d13Ca.pc[i] = d13Ca.tau * ((1 - d13Ca.phi ^ 2) / (1 - d13Ca.phi ^ (2 * dt)))
   }
+  
+  ## Initial conditions
+  pCO2.eps[1] = 0
+  pCO2[1] = pCO2.s * 1e3
+  pCO2.s ~ dunif(0.1, 1)
+  
+  d13Ca.eps[1] = 0
+  d13Ca[1] ~ dunif(-8, -3)
+  
+  ## Priors
+  pCO2.phi ~ dbeta(5, 2)
+  pCO2.tau ~ dgamma(1, 0.2)
+  
+  d13Ca.phi ~ dbeta(5, 2)
+  d13Ca.tau ~ dgamma(1, 20)
   
   # Site dependent ----
   for(i in 1:length(sites)){
