@@ -1,10 +1,61 @@
-library(openxlsx)
-source("code/helpers.R")
-library(R2jags)
+# Phytoplankton forward PSM driver for discrete paleo reconstruction, mui calibration integrated in jags model
+# Incorporates both modern observational data and GIG data to calibrate mui = f(radius, po4)
+# Dustin T. Harper
+############################################################################################
 
-# Proxy file ----
-prox.file <- "data/proxyData/phyto_Intermediate_combined.xlsx"
+# Load libraries
+############################################################################################
+library(rjags)
+library(R2jags)
+library(readxl)
+
+############################################################################################
+
+
+# File paths
+############################################################################################
+cal.file <- "caldata_culture.csv"
+size.file <- "HP07_sizedata.csv"
+gig.file <- "timeseriesGIG.csv"
+prox.file <- "phyto_Intermediate_combined.xlsx"
 prox.sheet <- "data4PSM"
+
+if (!file.exists(prox.file)) stop("Proxy intermediate file not found: ", prox.file)
+############################################################################################
+
+
+# Multi linear regression model for prior slopes and intercepts to calculate mu(i)
+############################################################################################
+# Read in instantaneous growth rate (mu,i) culture calibration data from Aloisi et al. (2015)
+# with calculated mean radius from measured coccosphere using Henderiks and Pagani (2007) transfer functions
+cal.df <- read.csv(cal.file)
+cal.df <- subset(cal.df, !is.na(radius) & !is.na(po4) & !is.na(mui) & radius <= 10 & po4 <= 2)
+cal.df$radius <- cal.df$radius*1e-6
+
+# Generate multiple linear regression model mu,i (as a function of [PO4] and mean radius)
+igr.model <- lm(mui ~ po4 + radius, data=cal.df)
+igr.model.sum <- summary(igr.model)
+
+# Load prior coefficients and SEs for mui = f(po4, rm) from multi linear regression
+po4.co.lr <- igr.model.sum$coefficients[2,1]
+po4.se.lr <- igr.model.sum$coefficients[2,2]
+r.co.lr <- igr.model.sum$coefficients[3,1]
+r.se.lr <- igr.model.sum$coefficients[3,2]
+y.int.lr <- igr.model.sum$coefficients[1,1]
+y.int.se.lr <- igr.model.sum$coefficients[1,2]
+############################################################################################
+
+
+# Determine size-based transfer functions using linear regression and Henderiks and Pagani 07 data
+############################################################################################
+hp07 <- read.csv(size.file)
+lm.lith <- lm(lith.size ~ cell.r, data=hp07)
+lith.sum <- summary(lm.lith)
+
+lith.m <- lith.sum$coefficients[2,1]
+lith.b <- lith.sum$coefficients[1,1]
+############################################################################################
+
 
 # Generate look up tables for equilibrium constants
 ############################################################################################
@@ -45,6 +96,49 @@ n.temp <- nrow(K0a)
 n.sal <- ncol(K0a)
 ############################################################################################
 
+
+# Load GIG calibration data to evaluate against
+############################################################################################
+prox.in.gig <- read.csv(gig.file)
+prox.in.gig <- prox.in.gig[,1:12]
+names(prox.in.gig) <- c("site", "age", "po4.prior", "d13Cmarker.data", "d13Cmarker.data.sd", "d13Cpf.data",
+                        "d13Cpf.data.sd", "len.lith.data", "len.lith.data.sd", "Uk.data", "Uk.data.sd", "iceco2.data")
+prox.in.gig <- prox.in.gig[complete.cases(prox.in.gig[,c("site", "age", "po4.prior", "d13Cmarker.data", "d13Cmarker.data.sd", "d13Cpf.data",
+                                                         "d13Cpf.data.sd", "len.lith.data", "len.lith.data.sd", "Uk.data", "Uk.data.sd", "iceco2.data")]),]
+
+# Site index GIG calibration data
+prox.in.gig <- prox.in.gig[order(prox.in.gig$site),]
+prox.in.gig <- transform(prox.in.gig, site.index=as.numeric(factor(site)))
+site.index.gig <- prox.in.gig$site.index
+
+# Set prior distributions for GIG calibration data
+
+# Temperature (degrees C)
+tempC.m.gig <- 22
+tempC.p.gig <- 1/5^2
+
+# Salinity (ppt)
+sal.m.gig <- 35
+sal.p.gig <- 1/0.5^2
+
+# pCO2 (uatm)
+pco2.m.gig <- 250
+pco2.p.gig <- 1/40^2
+
+# d13C of aqueous CO2 (per mille)
+d13C.co2.m.gig <- -8
+d13C.co2.p.gig <- 1/1^2
+
+# Concentration of phosphate (PO4; umol/kg)
+po4.m.gig <- unique(prox.in.gig$po4.prior)
+po4.p.gig <- 1/0.25^2
+
+# Mean cell radius (m)
+rm.m.gig <- 1.5e-6
+rm.p.gig <- 1/(0.5e-6)^2
+############################################################################################
+
+
 # Load discrete proxy data for reconstruction from intermediate workbook
 ############################################################################################
 # State bins define the spatial/temporal resolution of each discrete inversion state
@@ -55,8 +149,8 @@ state.age.origin <- 0
 state.lat.origin <- -90
 state.lon.origin <- -180
 
-prox.raw <- read.xlsx(prox.file, sheet = prox.sheet, startRow = 4, 
-                      na.strings = c("", "NA", "#N/A"))
+prox.raw <- readxl::read_excel(prox.file, sheet=prox.sheet, skip=3, na=c("", "NA", "#N/A"))
+prox.raw <- as.data.frame(prox.raw)
 names(prox.raw) <- trimws(names(prox.raw))
 
 num <- function(x) suppressWarnings(as.numeric(x))
@@ -138,8 +232,6 @@ prox.in <- data.frame(sample=sample.id,
 prox.in <- prox.in[complete.cases(prox.in[,c("sample", "doi", "lat", "lon", "age", "po4.prior", "po4.prior.sd",
                                              "tempC.prior", "tempC.prior.sd", "d13Cmarker.data",
                                              "d13Cmarker.data.sd")]),]
-
-
 
 # Define discrete state bins using user-selected temporal and spatial integration windows
 prox.in$age.bin <- floor((prox.in$age-state.age.origin)/state.age.width)

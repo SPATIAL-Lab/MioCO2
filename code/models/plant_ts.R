@@ -164,9 +164,10 @@ model {
   # Global time-dependent ----  
   for(i in 2:nstep){
     ## Primary environmental ----
-    pCO2[i] = pCO2[i - 1] + pCO2.eps[i]
-    pCO2.eps[i] ~ dnorm(pCO2.eps[i - 1] * (pCO2.phi ^ dt), pCO2.pc[i])
-    pCO2.pc[i] = pCO2.tau * ((1 - pCO2.phi ^ 2) / (1 - pCO2.phi ^ (2 * dt)))
+    pCO2[i] ~ dgamma(pCO2[i - 1] ^ 2 / pCO2.v, pCO2[i - 1] / pCO2.v)
+    #    pCO2[i] = pCO2[i - 1] + pCO2.eps[i]
+    #    pCO2.eps[i] ~ dnorm(pCO2.eps[i - 1] * (pCO2.phi ^ dt), pCO2.pc[i])
+    #    pCO2.pc[i] = pCO2.tau * ((1 - pCO2.phi ^ 2) / (1 - pCO2.phi ^ (2 * dt)))
     
     d13Ca[i] = d13Ca[i - 1] + d13Ca.eps[i]
     d13Ca.eps[i] ~ dnorm(d13Ca.eps[i - 1] * (d13Ca.phi ^ dt), d13Ca.pc[i])
@@ -174,7 +175,7 @@ model {
   }
   
   ## Initial conditions
-  pCO2.eps[1] = 0
+  # pCO2.eps[1] = 0
   pCO2[1] = pCO2.s * 1e3
   pCO2.s ~ dunif(0.3, 0.5)
   
@@ -182,8 +183,9 @@ model {
   d13Ca[1] ~ dunif(-8, -3)
   
   ## Priors
-  pCO2.tau ~ dgamma(5, 1e3) 
-  pCO2.phi ~ dbeta(5, 2)
+  pCO2.v ~ dgamma(10, 1)
+  #  pCO2.tau ~ dgamma(10, 1e3) 
+  #  pCO2.phi ~ dbeta(2, 5)
   
   d13Ca.phi ~ dbeta(5, 2)
   d13Ca.tau ~ dgamma(5, 1e-2)
