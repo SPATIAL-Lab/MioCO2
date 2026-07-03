@@ -46,7 +46,7 @@ model {
   
   
   ############################################################################################
-  # Discrete proxy data likelihoods
+  # Proxy data likelihoods
   ############################################################################################
   # The observation data are still evaluated row by row, but each observation points to a
   # spatial/temporal state. The expensive PSM is evaluated once per state below.
@@ -54,7 +54,7 @@ model {
     d13Cmarker.data[i] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.data.sd[i] ^ 2)
   }
 
-  for(i in 1:length(ai)){
+  for(i in 1:length(n.steps)){
     d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
   }
     
@@ -146,11 +146,11 @@ model {
   ############################################################################################
   
   # Site-dependent
-  for(i in 1:length(si)){
-    for(j in 2:length(ai)){
+  for(i in 1:n.sites){
+    for(j in 2:n.steps){
       ## Temperature (degrees C)
       tempC[i, j] = MAT[j] + toff[i, j]
-      toff[i, j] ~ toff[i, j - 1] + toff.eps[i, j]
+      toff[i, j] = toff[i, j - 1] + toff.eps[i, j]
       toff.eps[i, j] ~ dnorm(toff.eps[i, j - 1] * (toff.phi ^ dt), toff.pc[i, j])
       toff.pc[i, j] = toff.tau * ((1 - toff.phi ^ 2) / (1 - toff.phi ^ (2 * dt)))
         
@@ -187,16 +187,20 @@ model {
   rm.v ~ dgamma(10, 1e-13)
 
   # Global
-  for(i in 2:length(ai)){
+  for(i in 2:n.steps){
     # pCO2 (uatm)
     pCO2[i] ~ dgamma(pCO2[i - 1] ^ 2 / pCO2.v, pCO2[i - 1] / pCO2.v)
     
     # d13C of aqueous CO2 (per mille)
-    d13C.co2[i] ~ dnorm(d13C.co2.m[i], d13C.co2.p[i])
+    d13C.co2[i] = d13C.co2[i - 1] + d13C.co2.eps[i]
+    d13C.co2.eps[i] ~ dnorm(d13C.co2.eps[i - 1] * d13C.co2.phi ^ dt, 
+                         d13C.co2.pc[i])
+    d13C.co2.pc[i] = d13C.co2.tau * ((1 - d13C.co2.phi ^ 2) / 
+                                   (1 - d13C.co2.phi ^ (2 * dt)))
     
     # Global MAT in degrees C
     MAT[i] = MAT[i - 1] + MAT.eps[i]
-    MAT.eps[i] ~ dnorm(MAT.eps[i - 1] * (MAT.phi ^ dt), MAT.pc[i])
+    MAT.eps[i] ~ dnorm(MAT.eps[i - 1] * MAT.phi ^ dt, MAT.pc[i])
     MAT.pc[i] = MAT.tau * ((1 - MAT.phi ^ 2) / (1 - MAT.phi ^ (2 * dt)))
   }
   

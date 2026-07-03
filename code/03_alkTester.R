@@ -58,14 +58,6 @@ lith.b <- lith.sum$coefficients[1,1]
 
 # Load discrete proxy data for reconstruction from intermediate workbook
 ############################################################################################
-# State bins define the spatial/temporal resolution of each discrete inversion state
-state.age.width <- 5
-state.lat.width <- 20
-state.lon.width <- 20
-state.age.origin <- 0
-state.lat.origin <- -90
-state.lon.origin <- -180
-
 prox.raw <- read.xlsx(prox.file, sheet = prox.sheet, startRow = 4, 
                       na.strings = c("", "NA", "#N/A"))
 names(prox.raw) <- trimws(names(prox.raw))
@@ -209,7 +201,6 @@ po4.v <- prox.in$po4.prior.sd ^ 2
 rm.m <- rep(1.5e-6, n.obs)
 rm.v <- rep(0.5e-6 ^ 2, n.obs)
 
-
 ############################################################################################
 
 
@@ -260,7 +251,6 @@ inv.out <- jags.parallel(data = data.pass, model.file = "code/models/phyto.R",
                          n.iter = 2e5, n.burnin = 1e5, n.thin = 100)
 ############################################################################################
 
-
 View(inv.out$BUGSoutput$summary)
 
 plot(prox.in$age, inv.out$BUGSoutput$median$pCO2)
@@ -287,7 +277,8 @@ for(i in seq_along(prox.in$age)){
 }
 
 ## Site index
-si = 
+sites = unique(prox.in$lat + prox.in$lon)
+si = match(prox.in$lat + prox.in$lon, sites)
 
 po4.pri = data.frame(po4.m, po4.v)
 
@@ -295,9 +286,12 @@ po4.pri = data.frame(po4.m, po4.v)
 ############################################################################################
 data.pass <- list("n.obs" = n.obs,
                   "n.lith" = n.lith,
+                  "n.steps" = length(ages),
+                  "n.sites" = length(sites),
                   "n.temp" = n.temp,
                   "n.sal" = n.sal,
                   "ai" = ai,
+                  "dt" = stepsize,
                   "si" = si,
                   "lith.m" = lith.m,
                   "lith.b" = lith.b,
@@ -309,9 +303,19 @@ data.pass <- list("n.obs" = n.obs,
                   "s.inc" = s.inc,
                   "d13Cmarker.data" = prox.in$d13Cmarker.data[marker.keep],
                   "d13Cmarker.data.sd" = prox.in$d13Cmarker.data.sd[marker.keep],
-                  "d13Ca.obs" = prox.in$d13Ca.obs,
+                  "d13Ca.obs" = d13Ca.obs,
                   "len.lith.data" = lith.data,
                   "len.lith.data.sd" = lith.data.sd,
                   "lith.state.index" = lith.state.index,
                   "po4.pri" = po4.pri)
 ############################################################################################
+
+# Run the inversion using jags
+############################################################################################
+inv.out <- jags.parallel(data = data.pass, model.file = "code/models/phyto_ts.R", 
+                         parameters.to.save = parms, inits = NULL, n.chains = 3, 
+                         n.iter = 1e3, n.burnin = 5e2, n.thin = 1)
+############################################################################################
+
+View(inv.out$BUGSoutput$summary)
+
