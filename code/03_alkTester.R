@@ -167,8 +167,6 @@ lith.keep <- which(!is.na(prox.in$len.lith.data) & !is.na(prox.in$len.lith.data.
 
 n.lith <- length(lith.keep)
 
-if (n.marker < 1) stop("No d13C marker observations available after filtering")
-
 # If there are no lith observations, pass one effectively uninformative row so JAGS can compile.
 if (n.lith < 1){
   n.lith <- 1
@@ -267,3 +265,53 @@ View(inv.out$BUGSoutput$summary)
 
 plot(prox.in$age, inv.out$BUGSoutput$median$pCO2)
 plot(prox.in$age, inv.out$BUGSoutput$median$d13C.co2)
+
+# Timeseries inversion
+
+## Age vector
+stepsize = 0.1
+ages = seq(25 - stepsize / 2, 5 - stepsize / 2, by = -stepsize)
+
+## d13Ca
+d13Ca.obs = data.frame("d13Ca" = numeric(length(ages)),
+                       "d13Ca.sd" = numeric(length(ages)))
+for(i in seq_along(ages)){
+  d13Ca.obs[i, 1] = d13Ca$d13Ca_50[which.min(abs(ages[i] - d13Ca$age))]
+  d13Ca.obs[i, 2] = d13Ca$sd[which.min(abs(ages[i] - d13Ca$age))]
+}
+
+## Age index
+ai = numeric(nrow(prox.in))
+for(i in seq_along(prox.in$age)){
+  ai[i] = which.min(abs(prox.in$age[i] - ages))
+}
+
+## Site index
+si = 
+
+po4.pri = data.frame(po4.m, po4.v)
+
+# Select data to pass to jags
+############################################################################################
+data.pass <- list("n.obs" = n.obs,
+                  "n.lith" = n.lith,
+                  "n.temp" = n.temp,
+                  "n.sal" = n.sal,
+                  "ai" = ai,
+                  "si" = si,
+                  "lith.m" = lith.m,
+                  "lith.b" = lith.b,
+                  "K0a" = K0a,
+                  "Ksw_sta" = Ksw_sta,
+                  "sal.lb" = sal.lb,
+                  "tempC.lb" = tempC.lb,
+                  "t.inc" = t.inc,
+                  "s.inc" = s.inc,
+                  "d13Cmarker.data" = prox.in$d13Cmarker.data[marker.keep],
+                  "d13Cmarker.data.sd" = prox.in$d13Cmarker.data.sd[marker.keep],
+                  "d13Ca.obs" = prox.in$d13Ca.obs,
+                  "len.lith.data" = lith.data,
+                  "len.lith.data.sd" = lith.data.sd,
+                  "lith.state.index" = lith.state.index,
+                  "po4.pri" = po4.pri)
+############################################################################################
