@@ -50,14 +50,15 @@ model {
   ############################################################################################
   # The observation data are still evaluated row by row, but each observation points to a
   # spatial/temporal state. The expensive PSM is evaluated once per state below.
-  for (i in 1:n.marker){
-    d13Cmarker.data[i] ~ dnorm(d13Cmarker[marker.state.index[i]], d13Cmarker.p[i])
-    d13Cmarker.p[i] = 1/d13Cmarker.data.sd[i]^2
+  for (i in 1:n.obs){
+    d13Cmarker.data[i] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.data.sd[i] ^ 2)
+
+    d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
   }
   
   for (i in 1:n.lith){
-    len.lith.data[i] ~ dnorm(len.lith[lith.state.index[i]], len.lith.p[i])
-    len.lith.p[i] = 1/len.lith.data.sd[i]^2
+    len.lith.data[i] ~ dnorm(len.lith[lith.state.index[i]], 
+                             1 / len.lith.data.sd[i] ^ 2)
   }
   ############################################################################################
   
@@ -65,7 +66,7 @@ model {
   ############################################################################################
   # Proxy System Model - discrete proxy states
   ############################################################################################
-  for (i in 1:n.state){
+  for (i in 1:n.obs){
     # Use temperature directly from the intermediate-file state prior
     temp[i] = tempC[i] + 273.15
     
@@ -76,7 +77,7 @@ model {
     Ksw.noP[i] = Ksw_sta[t.index[i], s.index[i]]
     
     # Calculate aqueous CO2 from atmospheric CO2 with Henry's law (carb chem)
-    fco2[i] = pco2[i] * 0.9968
+    fco2[i] = pCO2[i] * 0.9968
     co2[i] = fco2[i] * K0[i] * 1e-3 # mol/m^3 (uM)
     
     # Calculate length of the coccolith from mean radius (rm)
@@ -104,7 +105,7 @@ model {
     
     # Calculate instantaneous growth rate (mu,i) from [PO4] and rmean
     mui.err[i] ~ dnorm(0, 1 / mui.y.var)
-    mui[i] = coeff.po4 * po4[i] + coeff.rm*rm[i] + mui.y.int + mui.err
+    mui[i] = coeff.po4 * po4[i] + coeff.rm * rm[i] + mui.y.int + mui.err[i]
 #    mui[i] = max(mui.raw[i], 1*10^-6)
     
     # Calculate Qs (the co2 flux into the cell per unit surface area of the cell membrane)
@@ -123,6 +124,12 @@ model {
     
     # Calculate d13C.marker from d13C.biomass (eqn 22)
     d13Cmarker[i] = ((d13C.biomass[i] + 1e3) / ((eps.bob/1e3) + 1)) - 1e3
+    
+    # Calculate d13Ca from d13C.co2
+    eps.co2.aq.g[i] = -373 / temp[i] + 0.19
+    alpha.co2.aq.g[i] = 1 + eps.co2.aq.g[i] / 1e3
+    d13Ca[i] = (d13C.co2[i] + 1e3) / alpha.co2.aq.g[i] - 1e3
+    
   }
   ############################################################################################
   
@@ -130,24 +137,25 @@ model {
   ############################################################################################
   # Environmental prior distributions - discrete proxy states
   ############################################################################################
-  for (i in 1:n.state){
+  for (i in 1:n.obs){
     # Temperature (degrees C)
     tempC[i] ~ dnorm(tempC.m[i], tempC.p[i])
     
     # Salinity (ppt)
-    sal[i] ~ dnorm(sal.m[i], sal.p[i])T(0,)
+    sal[i] ~ dgamma(sal.m[i] ^ 2 / sal.v[i], sal.m[i] / sal.v[i])
     
     # pCO2 (uatm)
-    pco2[i] ~ dnorm(pco2.m[i], pco2.p[i])T(pco2.lb[i], pco2.ub[i])
+    pCO2[i] = ca.s[i] * 1e3
+    ca.s[i] ~ dunif(0.1, 2)  
     
     # d13C of aqueous CO2 (per mille)
     d13C.co2[i] ~ dnorm(d13C.co2.m[i], d13C.co2.p[i])
     
     # Concentration of phosphate (PO4; umol/kg)
-    po4[i] ~ dnorm(po4.m[i], po4.p[i])T(0,2)
+    po4[i] ~ dgamma(po4.m[i] ^ 2 / po4.v[i], po4.m[i] / po4.v[i])
     
     # Mean cell radius (m)
-    rm[i] ~ dnorm(rm.m[i], rm.p[i])T(0,5*10^-6)
+    rm[i] ~ dgamma(rm.m[i] ^ 2 / rm.v[i], rm.m[i] / rm.v[i])
   }
   ############################################################################################
   

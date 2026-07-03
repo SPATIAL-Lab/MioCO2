@@ -5,6 +5,7 @@ library(R2jags)
 # Proxy file ----
 prox.file <- "data/proxyData/phyto_Intermediate_combined.xlsx"
 prox.sheet <- "data4PSM"
+size.file <- "data/HP07_sizedata.csv"
 
 # Generate look up tables for equilibrium constants
 ############################################################################################
@@ -43,6 +44,16 @@ for (i in 1:length(tempC.vr)){
 
 n.temp <- nrow(K0a)
 n.sal <- ncol(K0a)
+############################################################################################
+
+# Determine size-based transfer functions using linear regression and Henderiks and Pagani 07 data
+############################################################################################
+hp07 <- read.csv(size.file)
+lm.lith <- lm(lith.size ~ cell.r, data=hp07)
+lith.sum <- summary(lm.lith)
+
+lith.m <- lith.sum$coefficients[2,1]
+lith.b <- lith.sum$coefficients[1,1]
 ############################################################################################
 
 # Load discrete proxy data for reconstruction from intermediate workbook
@@ -138,26 +149,22 @@ prox.in <- data.frame(sample=sample.id,
 prox.in <- prox.in[complete.cases(prox.in[,c("sample", "doi", "lat", "lon", "age", "po4.prior", "po4.prior.sd",
                                              "tempC.prior", "tempC.prior.sd", "d13Cmarker.data",
                                              "d13Cmarker.data.sd")]),]
-
-
-
-# Define discrete state bins using user-selected temporal and spatial integration windows
-prox.in$age.bin <- floor((prox.in$age-state.age.origin)/state.age.width)
-prox.in$lat.bin <- floor((prox.in$lat-state.lat.origin)/state.lat.width)
-prox.in$lon.bin <- floor((prox.in$lon-state.lon.origin)/state.lon.width)
-prox.in$state.id <- paste(prox.in$age.bin, prox.in$lat.bin, prox.in$lon.bin, sep="_")
-prox.in$state.index <- as.numeric(factor(prox.in$state.id))
-prox.in <- prox.in[order(prox.in$state.index, prox.in$age, prox.in$lat, prox.in$lon),]
-
-state.levels <- levels(factor(prox.in$state.id))
-n.state <- length(state.levels)
+prox.in = prox.in[prox.in$age < 25 & prox.in$age > 5, ]
 n.obs <- nrow(prox.in)
+
+## Add d13Ca
+d13Ca = read.csv("data/d13Ca_Cenozoic.csv")
+d13Ca$sd = (d13Ca$d13Ca_97p5 - d13Ca$d13Ca_2p5) / 2
+
+## Age index in 100kyr bins
+prox.in$d13Ca.obs = data.frame("d13Ca.m" = d13Ca$d13Ca_50[round(prox.in$age * 10, 0)],
+                              "d13Ca.sd" = d13Ca$sd[round(prox.in$age * 10, 0)])
+
 
 # Build compact observation vectors. Marker observations are required; lith observations are used only where present.
 marker.keep <- which(!is.na(prox.in$d13Cmarker.data) & !is.na(prox.in$d13Cmarker.data.sd) & prox.in$d13Cmarker.data.sd > 0)
 lith.keep <- which(!is.na(prox.in$len.lith.data) & !is.na(prox.in$len.lith.data.sd) & prox.in$len.lith.data.sd > 0)
 
-n.marker <- length(marker.keep)
 n.lith <- length(lith.keep)
 
 if (n.marker < 1) stop("No d13C marker observations available after filtering")
@@ -171,50 +178,38 @@ if (n.lith < 1){
 } else {
   lith.data <- prox.in$len.lith.data[lith.keep]
   lith.data.sd <- prox.in$len.lith.data.sd[lith.keep]
-  lith.state.index <- prox.in$state.index[lith.keep]
+  lith.state.index <- lith.keep
 }
 
 # Collapse environmental priors to state level, while retaining every observation in the likelihood.
-temp.state <- state_prior(prox.in$tempC.prior, prox.in$tempC.prior.sd, prox.in$state.index, n.state, min.sd=1)
-po4.state <- state_prior(prox.in$po4.prior, prox.in$po4.prior.sd, prox.in$state.index, n.state, min.sd=0.05)
+#temp.state <- state_prior(prox.in$tempC.prior, prox.in$tempC.prior.sd, prox.in$state.index, n.state, min.sd=1)
+#po4.state <- state_prior(prox.in$po4.prior, prox.in$po4.prior.sd, prox.in$state.index, n.state, min.sd=0.05)
 
-state.df <- aggregate(cbind(age, lat, lon) ~ state.index + state.id + age.bin + lat.bin + lon.bin,
-                      data=prox.in, FUN=mean)
-state.df <- state.df[order(state.df$state.index),]
-state.df$n.obs <- as.numeric(table(prox.in$state.index)[as.character(state.df$state.index)])
-
-# Dimensions
-n.cd <- nrow(cal.df)
-n.gig <- nrow(prox.in.gig)
-n.prox <- n.state
+#state.df <- aggregate(cbind(age, lat, lon) ~ state.index + state.id + age.bin + lat.bin + lon.bin,
+#                      data=prox.in, FUN=mean)
+#state.df <- state.df[order(state.df$state.index),]
+#state.df$n.obs <- as.numeric(table(prox.in$state.index)[as.character(state.df$state.index)])
 
 # Set prior distributions for discrete proxy states
 # Temperature (degrees C)
-tempC.m <- temp.state$mean
-tempC.p <- 1/temp.state$sd^2
+tempC.m <- prox.in$tempC.prior
+tempC.p <- 1 / prox.in$tempC.prior.sd ^ 2
 
 # Salinity (ppt)
-sal.m <- rep(35, n.state)
-sal.p <- rep(1/2^2, n.state)
-
-# pCO2 (uatm)
-pco2.m <- rep(450, n.state)
-pco2.p <- rep(1/250^2, n.state)
-pco2.lb <- rep(50, n.state)
-pco2.ub <- rep(1500, n.state)
+sal.m <- rep(35, n.obs)
+sal.v <- rep(2 ^ 2, n.obs)
 
 # d13C of aqueous CO2 (per mille)
-d13C.co2.m <- rep(-8, n.state)
-d13C.co2.p <- rep(1/1^2, n.state)
+d13C.co2.m <- rep(-8, n.obs)
+d13C.co2.p <- rep(1 / 1 ^ 2, n.obs)
 
 # Concentration of phosphate (PO4; umol/kg)
-po4.m.cd <- 1.5
-po4.m <- po4.state$mean
-po4.p <- 1/po4.state$sd^2
+po4.m <- prox.in$po4.prior
+po4.v <- prox.in$po4.prior.sd ^ 2
 
 # Mean cell radius (m)
-rm.m <- rep(1.5e-6, n.state)
-rm.p <- rep(1/(0.5e-6)^2, n.state)
+rm.m <- rep(1.5e-6, n.obs)
+rm.v <- rep(0.5e-6 ^ 2, n.obs)
 
 
 ############################################################################################
@@ -222,92 +217,53 @@ rm.p <- rep(1/(0.5e-6)^2, n.state)
 
 # Select data to pass to jags
 ############################################################################################
-data.pass <- list("n.cd" = n.cd,
-                  "n.gig" = n.gig,
-                  "n.prox" = n.prox,
-                  "n.state" = n.state,
-                  "n.marker" = n.marker,
+data.pass <- list("n.obs" = n.obs,
                   "n.lith" = n.lith,
                   "n.temp" = n.temp,
                   "n.sal" = n.sal,
-                  "po4.co.lr" = po4.co.lr,
-                  "po4.se.lr" = po4.se.lr,
-                  "r.co.lr" = r.co.lr,
-                  "r.se.lr" = r.se.lr,
-                  "y.int.lr" = y.int.lr,
-                  "y.int.se.lr" = y.int.se.lr,
                   "lith.m" = lith.m,
                   "lith.b" = lith.b,
-                  "radius.cd" = cal.df$radius,
-                  "po4.cd.data" = cal.df$po4,
-                  "mui.cd.data" = cal.df$mui,
                   "K0a" = K0a,
                   "Ksw_sta" = Ksw_sta,
                   "sal.lb" = sal.lb,
                   "tempC.lb" = tempC.lb,
                   "t.inc" = t.inc,
                   "s.inc" = s.inc,
-                  "d13Cmarker.data.gig" = prox.in.gig$d13Cmarker.data,
-                  "d13Cmarker.data.sd.gig" = prox.in.gig$d13Cmarker.data.sd,
-                  "d13Cpf.data.gig" = prox.in.gig$d13Cpf.data,
-                  "d13Cpf.data.sd.gig" = prox.in.gig$d13Cpf.data.sd,
-                  "len.lith.data.gig" = prox.in.gig$len.lith.data,
-                  "len.lith.data.sd.gig" = prox.in.gig$len.lith.data.sd,
-                  "Uk.data.gig" = prox.in.gig$Uk.data,
-                  "Uk.data.sd.gig" = prox.in.gig$Uk.data.sd,
-                  "iceco2.data.gig" = prox.in.gig$iceco2.data,
-                  "site.index.gig" = site.index.gig,
-                  "tempC.m.gig" = tempC.m.gig,
-                  "tempC.p.gig" = tempC.p.gig,
-                  "sal.m.gig" = sal.m.gig,
-                  "sal.p.gig" = sal.p.gig,
-                  "pco2.m.gig" = pco2.m.gig,
-                  "pco2.p.gig" = pco2.p.gig,
-                  "d13C.co2.m.gig" = d13C.co2.m.gig,
-                  "d13C.co2.p.gig" = d13C.co2.p.gig,
-                  "po4.m.gig" = po4.m.gig,
-                  "po4.p.gig" = po4.p.gig,
-                  "rm.m.gig" = rm.m.gig,
-                  "rm.p.gig" = rm.p.gig,
                   "d13Cmarker.data" = prox.in$d13Cmarker.data[marker.keep],
                   "d13Cmarker.data.sd" = prox.in$d13Cmarker.data.sd[marker.keep],
-                  "marker.state.index" = prox.in$state.index[marker.keep],
+                  "d13Ca.obs" = prox.in$d13Ca.obs,
                   "len.lith.data" = lith.data,
                   "len.lith.data.sd" = lith.data.sd,
                   "lith.state.index" = lith.state.index,
                   "tempC.m" = tempC.m,
                   "tempC.p" = tempC.p,
                   "sal.m" = sal.m,
-                  "sal.p" = sal.p,
-                  "pco2.m" = pco2.m,
-                  "pco2.p" = pco2.p,
-                  "pco2.lb" = pco2.lb,
-                  "pco2.ub" = pco2.ub,
+                  "sal.v" = sal.v,
                   "d13C.co2.m" = d13C.co2.m,
                   "d13C.co2.p" = d13C.co2.p,
                   "po4.m" = po4.m,
-                  "po4.m.cd" = po4.m.cd,
-                  "po4.p" = po4.p,
+                  "po4.v" = po4.v,
                   "rm.m" = rm.m,
-                  "rm.p" = rm.p)
+                  "rm.v" = rm.v)
 ############################################################################################
 
 
 # Parameters to save as output
 ############################################################################################
-parms <- c("tempC", "sal", "pco2", "pco2.gig", "d13C.co2", "po4", "rm", "b", "b.gig",
-           "eps.p", "eps.p.gig", "d13Cmarker", "len.lith", "coeff.po4", "coeff.rm",
-           "mui.y.int", "sigma.mui.cd", "eps.f", "eps.d", "eps.bob", "P.c")
+parms <- c("tempC", "sal", "pCO2", "d13C.co2", "d13Ca", "po4", "rm", "b",
+           "eps.p", "d13Cmarker", "len.lith", "coeff.po4", "coeff.rm")
 ############################################################################################
 
 
 # Run the inversion using jags
 ############################################################################################
-inv.out <- jags.parallel(data=data.pass, model.file="discrete_phyto_psm.R", parameters.to.save=parms,
-                         inits=NULL, n.chains=3, n.iter=1e3,
-                         n.burnin=5e2, n.thin=1)
+inv.out <- jags.parallel(data = data.pass, model.file = "code/models/phyto.R", 
+                         parameters.to.save = parms, inits = NULL, n.chains = 3, 
+                         n.iter = 2e5, n.burnin = 1e5, n.thin = 100)
 ############################################################################################
 
 
 View(inv.out$BUGSoutput$summary)
 
+plot(prox.in$age, inv.out$BUGSoutput$median$pCO2)
+plot(prox.in$age, inv.out$BUGSoutput$median$d13C.co2)
