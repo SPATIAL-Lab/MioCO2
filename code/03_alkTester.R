@@ -148,13 +148,17 @@ n.obs <- nrow(prox.in)
 d13Ca = read.csv("data/d13Ca_Cenozoic.csv")
 d13Ca$sd = (d13Ca$d13Ca_97p5 - d13Ca$d13Ca_2p5) / 2
 
-## Age index in 100kyr bins
+## Proxy data input
 prox.in$d13Ca.obs = data.frame("d13Ca.m" = d13Ca$d13Ca_50[round(prox.in$age * 10, 0)],
                               "d13Ca.sd" = d13Ca$sd[round(prox.in$age * 10, 0)])
 
+prox.in$temp.obs = data.frame("temp.m" = prox.in$tempC.prior,
+                          "temp.sd" = prox.in$tempC.prior.sd)
+
+prox.in$po4.obs = data.frame("po4.m" = prox.in$po4.prior,
+                             "po4.sd" = prox.in$po4.prior.sd)
 
 # Build compact observation vectors. Marker observations are required; lith observations are used only where present.
-marker.keep <- which(!is.na(prox.in$d13Cmarker.data) & !is.na(prox.in$d13Cmarker.data.sd) & prox.in$d13Cmarker.data.sd > 0)
 lith.keep <- which(!is.na(prox.in$len.lith.data) & !is.na(prox.in$len.lith.data.sd) & prox.in$len.lith.data.sd > 0)
 
 n.lith <- length(lith.keep)
@@ -180,27 +184,6 @@ if (n.lith < 1){
 #state.df <- state.df[order(state.df$state.index),]
 #state.df$n.obs <- as.numeric(table(prox.in$state.index)[as.character(state.df$state.index)])
 
-# Set prior distributions for discrete proxy states
-# Temperature (degrees C)
-tempC.m <- prox.in$tempC.prior
-tempC.p <- 1 / prox.in$tempC.prior.sd ^ 2
-
-# Salinity (ppt)
-sal.m <- rep(35, n.obs)
-sal.v <- rep(2 ^ 2, n.obs)
-
-# d13C of aqueous CO2 (per mille)
-d13C.co2.m <- rep(-8, n.obs)
-d13C.co2.p <- rep(1 / 1 ^ 2, n.obs)
-
-# Concentration of phosphate (PO4; umol/kg)
-po4.m <- prox.in$po4.prior
-po4.v <- prox.in$po4.prior.sd ^ 2
-
-# Mean cell radius (m)
-rm.m <- rep(1.5e-6, n.obs)
-rm.v <- rep(0.5e-6 ^ 2, n.obs)
-
 ############################################################################################
 
 
@@ -218,22 +201,14 @@ data.pass <- list("n.obs" = n.obs,
                   "tempC.lb" = tempC.lb,
                   "t.inc" = t.inc,
                   "s.inc" = s.inc,
-                  "d13Cmarker.data" = prox.in$d13Cmarker.data[marker.keep],
-                  "d13Cmarker.data.sd" = prox.in$d13Cmarker.data.sd[marker.keep],
+                  "d13Cmarker.data" = prox.in$d13Cmarker.data,
+                  "d13Cmarker.data.sd" = prox.in$d13Cmarker.data.sd,
                   "d13Ca.obs" = prox.in$d13Ca.obs,
+                  "temp.obs" = prox.in$temp.obs,
+                  "po4.obs" = prox.in$po4.obs,
                   "len.lith.data" = lith.data,
                   "len.lith.data.sd" = lith.data.sd,
-                  "lith.state.index" = lith.state.index,
-                  "tempC.m" = tempC.m,
-                  "tempC.p" = tempC.p,
-                  "sal.m" = sal.m,
-                  "sal.v" = sal.v,
-                  "d13C.co2.m" = d13C.co2.m,
-                  "d13C.co2.p" = d13C.co2.p,
-                  "po4.m" = po4.m,
-                  "po4.v" = po4.v,
-                  "rm.m" = rm.m,
-                  "rm.v" = rm.v)
+                  "lith.state.index" = lith.state.index)
 ############################################################################################
 
 
@@ -246,15 +221,15 @@ parms <- c("tempC", "sal", "pCO2", "d13C.co2", "d13Ca", "po4", "rm", "b",
 
 # Run the inversion using jags
 ############################################################################################
-inv.out <- jags.parallel(data = data.pass, model.file = "code/models/phyto.R", 
+post <- jags.parallel(data = data.pass, model.file = "code/models/phyto.R", 
                          parameters.to.save = parms, inits = NULL, n.chains = 3, 
                          n.iter = 2e5, n.burnin = 1e5, n.thin = 100)
 ############################################################################################
 
-View(inv.out$BUGSoutput$summary)
+View(post$BUGSoutput$summary)
 
-plot(prox.in$age, inv.out$BUGSoutput$median$pCO2)
-plot(prox.in$age, inv.out$BUGSoutput$median$d13C.co2)
+plot(prox.in$age, post$BUGSoutput$median$pCO2)
+plot(prox.in$age, post$BUGSoutput$median$d13C.co2)
 
 # Timeseries inversion
 
@@ -303,19 +278,35 @@ data.pass <- list("n.obs" = n.obs,
                   "s.inc" = s.inc,
                   "d13Cmarker.data" = prox.in$d13Cmarker.data[marker.keep],
                   "d13Cmarker.data.sd" = prox.in$d13Cmarker.data.sd[marker.keep],
-                  "d13Ca.obs" = d13Ca.obs,
+                  "d13Ca.obs" = prox.in$d13Ca.obs,
+                  "temp.obs" = prox.in$temp.obs,
+                  "po4.obs" = prox.in$po4.obs,
                   "len.lith.data" = lith.data,
                   "len.lith.data.sd" = lith.data.sd,
-                  "lith.state.index" = lith.state.index,
-                  "po4.pri" = po4.pri)
+                  "lith.state.index" = lith.state.index)
 ############################################################################################
 
 # Run the inversion using jags
 ############################################################################################
-inv.out <- jags.parallel(data = data.pass, model.file = "code/models/phyto_ts.R", 
+post.ts <- jags.parallel(data = data.pass, model.file = "code/models/phyto_ts.R", 
                          parameters.to.save = parms, inits = NULL, n.chains = 3, 
-                         n.iter = 1e3, n.burnin = 5e2, n.thin = 1)
+                         n.iter = 1e4, n.burnin = 5e3, n.thin = 1)
 ############################################################################################
 
-View(inv.out$BUGSoutput$summary)
+View(post.ts$BUGSoutput$summary)
 
+tsplot(ages, post.ts, "pCO2")
+pointplot(prox.in$age, post, "pCO2")
+
+plot(ages, post.ts$BUGSoutput$median$rm[1,] , ylim = c(1, 5), type = "l")
+for(i in 2:n.sites){
+  lines(ages, post.ts$BUGSoutput$median$rm[i,])
+}
+
+plot(ages, post.ts$BUGSoutput$median$po4[1,] , ylim = c(0.1, 2), type = "l")
+for(i in 2:n.sites){
+  lines(ages, post.ts$BUGSoutput$median$po4[i,])
+}
+
+plot(data.pass$d13Cmarker.data - data.pass$d13Ca.obs[ai, 1], post.ts$BUGSoutput$median$pCO2[ai])
+plot(data.pass$d13Cmarker.data - data.pass$d13Ca.obs[ai, 1], post$BUGSoutput$median$pCO2)
