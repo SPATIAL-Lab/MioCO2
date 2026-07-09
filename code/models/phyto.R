@@ -1,62 +1,17 @@
 model {
   
   ############################################################################################
-  # Shared constants and calibration parameters
-  ############################################################################################
-  
-  # eps.f = max fractionation by RuBisCO at infinite CO2 (generally 25 to 28‰), 
-  # post-calibration
-  eps.f ~ dnorm(26.6, 1 / 0.3 ^ 2)
-  
-  # epsilon of diffusive transport of CO2(aq) in water, post-calibration
-  eps.d ~ dnorm(0.656, 1 / 0.1 ^ 2)
-  
-  # epsilon of biomass/biomarker (C isotope fractionation b/w algal biomass and 
-  # biomarkers, or bob [b over b]), post-calibration
-  eps.bob ~ dnorm(4.4, 1 / 0.2 ^ 2)
-  
-  # cell wall permeability to CO2(aq) in m/s, post-calibration
-  P.c ~ dgamma(4.539e-5 ^ 2 / 1.4e-6 ^ 2, 4.539e-5 / 1.4e-6 ^ 2)
-  
-  # Uk'37 temperature calibration (Conte et al., 2006; sediment - AnnO linear model) 
-  # with 1.1C = reported se of estimation
-  Uk.sl = 29.876
-  Uk.int = 1.334
-  Uk.cal.se = 1.1
-  
-  # gas constant in J / K*mol
-  R.gc = 8.3143
-  
-  # pH value for calculating rk - held constant here; varying this has almost 
-  # zero effect on the model
-  pH.const = 8
-  hyd.const = 10 ^ (-pH.const)
-  
-  # Coefficient for mu(i) - PO4 multi linear regression, post-calibration
-  coeff.po4 = 1.998e-6
-  
-  # Coefficient for radius - PO4 multi linear regression, post-calibration
-  coeff.rm = -20
-  
-  # Coefficient for y intercept for mu(i) multi linear regression
-  mui.y.int = 4.011e-5
-  
-  # Approximate error variance for mu(i) calibration
-  mui.y.var = 2.5e-12 
-  
-  
-  ############################################################################################
   # Discrete proxy data likelihoods
   ############################################################################################
   # The observation data are still evaluated row by row, but each observation points to a
   # spatial/temporal state. The expensive PSM is evaluated once per state below.
-  for (i in 1:n.obs){
+  for(i in 1:n.obs){
     d13Cmarker.data[i] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.data.sd[i] ^ 2)
 
     d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
   }
   
-  for (i in 1:n.lith){
+  for(i in 1:n.lith){
     len.lith.data[i] ~ dnorm(len.lith[lith.state.index[i]], 
                              1 / len.lith.data.sd[i] ^ 2)
   }
@@ -158,5 +113,50 @@ model {
     rm[i] ~ dgamma(rm.m[i] ^ 2 / rm.v[i], rm.m[i] / rm.v[i])
   }
   ############################################################################################
+ 
+  ############################################################################################
+  # Shared constants and calibration parameters
+  ############################################################################################
+  
+  # eps.f = max fractionation by RuBisCO at infinite CO2 (generally 25 to 28‰), 
+  # post-calibration
+  eps.f ~ dnorm(26.6, 1 / 0.3 ^ 2)
+  
+  # epsilon of diffusive transport of CO2(aq) in water, post-calibration
+  eps.d ~ dnorm(0.656, 1 / 0.1 ^ 2)
+  
+  # epsilon of biomass/biomarker (C isotope fractionation b/w algal biomass and 
+  # biomarkers, or bob [b over b]), post-calibration
+  eps.bob ~ dnorm(4.4, 1 / 0.2 ^ 2)
+  
+  # cell wall permeability to CO2(aq) in m/s, post-calibration
+  P.c ~ dgamma(4.539e-5 ^ 2 / 1.4e-6 ^ 2, 4.539e-5 / 1.4e-6 ^ 2)
+  
+  # Uk'37 temperature calibration (Conte et al., 2006; sediment - AnnO linear model) 
+  # with 1.1C = reported se of estimation
+  Uk.sl = 29.876
+  Uk.int = 1.334
+  Uk.cal.se = 1.1
+  
+  # gas constant in J / K*mol
+  R.gc = 8.3143
+  
+  # pH value for calculating rk - held constant here; varying this has almost 
+  # zero effect on the model
+  pH.const = 8
+  hyd.const = 10 ^ (-pH.const)
+  
+  # Coefficient for mu(i) - PO4 multi linear regression, post-calibration
+  coeff.po4 = 1.998e-6
+  
+  # Coefficient for radius - PO4 multi linear regression, post-calibration
+  coeff.rm = -20
+  
+  # Coefficient for y intercept for mu(i) multi linear regression
+  mui.y.int = 4.011e-5
+  
+  # Approximate error variance for mu(i) calibration
+  mui.y.var = 2.5e-12 
+  
   
 }
