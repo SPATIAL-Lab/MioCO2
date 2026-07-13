@@ -6,7 +6,7 @@ model {
   # The observation data are still evaluated row by row, but each observation points to a
   # spatial/temporal state. The expensive PSM is evaluated once per state below.
   for(i in 1:n.obs){
-    d13Cmarker.data[i] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.data.sd[i] ^ 2)
+    d13Cmarker.obs[i, 1] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.obs[i, 2] ^ 2)
 
     d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
   }
@@ -94,23 +94,23 @@ model {
   ############################################################################################
   for (i in 1:n.obs){
     # Temperature (degrees C)
-    tempC[i] ~ dnorm(tempC.m[i], tempC.p[i])
+    tempC[i] ~ dnorm(temp.obs[i, 1], 1 / temp.obs[i, 2] ^ 2)
     
     # Salinity (ppt)
-    sal[i] ~ dgamma(sal.m[i] ^ 2 / sal.v[i], sal.m[i] / sal.v[i])
+    sal[i] ~ dgamma(35 ^ 2 / 4, 35 / 4)
     
     # pCO2 (uatm)
     pCO2[i] = ca.s[i] * 1e3
     ca.s[i] ~ dunif(0.1, 2)  
     
     # d13C of aqueous CO2 (per mille)
-    d13C.co2[i] ~ dnorm(d13C.co2.m[i], d13C.co2.p[i])
+    d13C.co2[i] ~ dunif(-8, -3)
     
     # Concentration of phosphate (PO4; umol/kg)
-    po4[i] ~ dgamma(po4.m[i] ^ 2 / po4.v[i], po4.m[i] / po4.v[i])
+    po4[i] ~ dgamma(po4.obs[i, 1] ^ 2 / po4.obs[i, 2], po4.obs[i, 1] / po4.obs[i, 2])
     
     # Mean cell radius (m)
-    rm[i] ~ dgamma(rm.m[i] ^ 2 / rm.v[i], rm.m[i] / rm.v[i])
+    rm[i] ~ dgamma(1.5 ^ 2 / 0.25, 1.5 / 0.25)T(1, 5)
   }
   ############################################################################################
  

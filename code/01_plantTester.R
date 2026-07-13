@@ -43,11 +43,11 @@ siteAges = d13Ca$age[unique(pd.p$ai)]
 ## Parameters to save
 parms = c("pCO2", "d13Ca")
 
-post = jags.parallel(pd.p.l, NULL, parms, "code/models/plant.R", 
+post.plants = jags.parallel(pd.p.l, NULL, parms, "code/models/plant.R", 
                      n.chains = 3, n.iter = 3e5, n.burnin = 1e5, n.thin = 1e2)
 
-View(post$BUGSoutput$summary)
-plot(d13Ca$age[unique(pd.p$ai)], post$BUGSoutput$median$pCO2)
+View(post.plants$BUGSoutput$summary)
+plot(d13Ca$age[unique(pd.p$ai)], post.plants$BUGSoutput$median$pCO2)
 
 # Run timeseries inversion ----
 ## Age vector
@@ -78,9 +78,11 @@ pd.p.l$nstep = length(ages)
 
 ## run it
 parms = c("pCO2", "d13Ca")
-post.ts = jags.parallel(pd.p.l, NULL, parms, "code/models/plant_ts.R", 
-                     n.chains = 3, n.iter = 5e4, n.burnin = 1e4, n.thin = 1e1)
+post.plants.ts = jags.parallel(pd.p.l, NULL, parms, "code/models/plant_ts.R", 
+                     n.chains = 3, n.iter = 1e5, n.burnin = 5e4, n.thin = 50)
 
-View(post.ts$BUGSoutput$summary)
-tsplot(ages, post.ts, "pCO2")
-pointplot(siteAges, post, "pCO2")
+View(post.plants.ts$BUGSoutput$summary)
+tsplot(ages, post.plants.ts, "pCO2")
+pointplot(siteAges, post.plants, "pCO2")
+
+save(post.plants, post.plants.ts, file = "bigout/plants.rda")

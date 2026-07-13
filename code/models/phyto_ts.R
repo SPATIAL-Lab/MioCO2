@@ -6,12 +6,12 @@ model {
   # The observation data are still evaluated row by row, but each observation points to a
   # spatial/temporal state. The expensive PSM is evaluated once per state below.
   for(i in 1:n.obs){
-    d13Cmarker.data[i] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.data.sd[i] ^ 2)
+    d13Cmarker.obs[i, 1] ~ dnorm(d13Cmarker[i], 1 / d13Cmarker.obs[i, 2] ^ 2)
     temp.obs[i, 1] ~ dnorm(tempC[si[i], ai[i]], 1 / temp.obs[i, 2] ^ 2)
     po4.obs[i, 1] ~ dnorm(po4[si[i], ai[i]], 1 / po4.obs[i, 2] ^ 2)
   }
 
-  for(i in 1:length(n.steps)){
+  for(i in 1:n.steps){
     d13Ca.obs[i, 1] ~ dnorm(d13Ca[i], 1 / d13Ca.obs[i, 2] ^ 2)
   }
     

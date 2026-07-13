@@ -44,17 +44,17 @@ pd.s.l$d13Ca.obs = data.frame("d13Ca.m" = d13Ca$d13Ca_50[round(pd.s.l$ages * 10,
 ## Parameters to save
 parms = c("pCO2", "d13Ca", "MAT", "MAP", "d13Cr", "S_z")
 
-post = jags.parallel(pd.s.l, NULL, parms, "code/models/soil.R", 
+post.soils = jags.parallel(pd.s.l, NULL, parms, "code/models/soil.R", 
                      n.chains = 3, n.iter = 1e5, n.burnin = 1e4, n.thin = 10)
 
-View(post$BUGSoutput$summary)
-plot(ages, post$BUGSoutput$median$pCO2)
+View(post.soils$BUGSoutput$summary)
+plot(ages, post.soils$BUGSoutput$median$pCO2)
 i = sample(seq_along(ages), 1)
-plot(post$BUGSoutput$sims.list$MAP[, i], post$BUGSoutput$sims.list$pCO2[, i])
-plot(post$BUGSoutput$sims.list$MAT[, i], post$BUGSoutput$sims.list$pCO2[, i])
-plot(post$BUGSoutput$sims.list$d13Ca[, i], post$BUGSoutput$sims.list$pCO2[, i])
+plot(post.soils$BUGSoutput$sims.list$MAP[, i], post.soils$BUGSoutput$sims.list$pCO2[, i])
+plot(post.soils$BUGSoutput$sims.list$MAT[, i], post.soils$BUGSoutput$sims.list$pCO2[, i])
+plot(post.soils$BUGSoutput$sims.list$d13Ca[, i], post.soils$BUGSoutput$sims.list$pCO2[, i])
 plot(pd.s.l$d13Cc.obs$d13C_cc - pd.s.l$d13Co.obs$d13Com_occluded, 
-     post$BUGSoutput$median$pCO2)
+     post.soils$BUGSoutput$median$pCO2)
 
 # Run timeseries inversion ----
 ## Age vector
@@ -86,29 +86,31 @@ parms = c("pCO2", "d13Ca", "MAT", "MAP", "PCQ_to", "PCQ_pf", "tsc",
           "f_R", "pore", "d13Cr", "S_z")
 
 ## Run it
-post.ts = jags.parallel(pd.s.l, NULL, parms, "code/models/soil_ts.R", 
-                        n.chains = 3, n.iter = 5e3, n.burnin = 1e3)
+post.soils.ts = jags.parallel(pd.s.l, NULL, parms, "code/models/soil_ts.R", 
+                        n.chains = 3, n.iter = 1e5, n.burnin = 5e4, n.thin = 10)
 
-View(post.ts$BUGSoutput$summary)
+View(post.soils.ts$BUGSoutput$summary)
 
-tsplot(ages, post.ts, "pCO2")
-pointplot(pd.s$age_mean, post, "pCO2")
-tsplot(ages, post.ts, "MAT")
+tsplot(ages, post.soils.ts, "pCO2")
+pointplot(pd.s$age_mean, post.soils, "pCO2")
+tsplot(ages, post.soils.ts, "MAT")
 points(pd.s$age_mean, pd.s$tempC)
-tsplot(ages, post.ts, "d13Ca")
+tsplot(ages, post.soils.ts, "d13Ca")
 points(d13Ca$age, d13Ca$d13Ca_50)
-tsplot(ages, post.ts, "MAP")
-tsplot(ages, post.ts, "PCQ_to")
-tsplot(ages, post.ts, "PCQ_pf")
-tsplot(ages, post.ts, "tsc")
-tsplot(ages, post.ts, "f_R")
-tsplot(ages, post.ts, "pore")
-tsplot(pd.s$age_mean, post.ts, "S_z")
-tsplot(pd.s$age_mean, post.ts, "d13Cr")
+tsplot(ages, post.soils.ts, "MAP")
+tsplot(ages, post.soils.ts, "PCQ_to")
+tsplot(ages, post.soils.ts, "PCQ_pf")
+tsplot(ages, post.soils.ts, "tsc")
+tsplot(ages, post.soils.ts, "f_R")
+tsplot(ages, post.soils.ts, "pore")
+tsplot(pd.s$age_mean, post.soils.ts, "S_z")
+tsplot(pd.s$age_mean, post.soils.ts, "d13Cr")
 points(pd.s$age_mean, pd.s$d13Com_occluded)
 plot(pd.s.l$d13Cc.obs$d13C_cc - pd.s.l$d13Co.obs$d13Com_occluded, 
-     post.ts$BUGSoutput$median$pCO2[pd.s.l$ai])
+     post.soils.ts$BUGSoutput$median$pCO2[pd.s.l$ai])
 
+
+save(post.soils, post.soils.ts, file = "bigout/soils.rda")
 
 # Current data structure
 ## datum
