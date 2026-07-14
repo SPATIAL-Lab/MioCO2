@@ -16,8 +16,7 @@ model {
   }
     
   for(i in 1:n.lith){
-    len.lith.data[i] ~ dnorm(len.lith[lith.state.index[i]], 
-                             1 / len.lith.data.sd[i] ^ 2)
+    lith.obs[i, 1] ~ dnorm(len.lith[li[i]], 1 / lith.obs[i, 2] ^ 2)
   }
   ############################################################################################
   
@@ -84,18 +83,17 @@ model {
     # Calculate eps.p from [CO2](aq), eps.f and b
     eps.p[i] = eps.f - (b[i] / (co2[i] * 1e3))
     
-    # Calculate d13C.biomass from d13C.co2 and epsilon.p (eqn 2)
-    d13C.biomass[i] = ((d13C.co2[ai[i]] + 1e3) / ((eps.p[i] / 1e3) + 1)) - 1e3
-    
-    # Calculate d13C.marker from d13C.biomass (eqn 22)
-    d13Cmarker[i] = ((d13C.biomass[i] + 1e3) / ((eps.bob/1e3) + 1)) - 1e3
-    
-    # Calculate d13Ca from d13C.co2
+    ### Calculate d13C.co2 from d13Ca
     eps.co2.aq.g[i] = -373 / temp[i] + 0.19
     alpha.co2.aq.g[i] = 1 + eps.co2.aq.g[i] / 1e3
-    d13Ca[i] = (d13C.co2[ai[i]] + 1e3) / alpha.co2.aq.g[i] - 1e3
+    d13C.co2[i] = d13Ca[ai[i]] * alpha.co2.aq.g[i] + eps.co2.aq.g[i]
     
-  }
+    # Calculate d13C.biomass from d13C.co2 and epsilon.p (eqn 2)
+    d13C.biomass[i] = d13C.co2[ai[i]] / (1 + eps.p[i] / 1e3) - eps.p[i]
+    
+    # Calculate d13C.marker from d13C.biomass (eqn 22)
+    d13Cmarker[i] = d13C.biomass[i] / (1 + eps.bob / 1e3) - eps.bob
+  } 
   ############################################################################################
   
   
@@ -130,7 +128,7 @@ model {
     
     po4[i, 1] ~ dunif(0.1, 1.5)
     
-    rm[i, 1] ~ dgamma(1.5 ^ 2 / 0.25, 1.5 / 0.25)
+    rm[i, 1] ~ dgamma(1.5 ^ 2 / 0.25 ^ 2, 1.5 / 0.25 ^ 2)
   }
   
   ## Priors
@@ -139,21 +137,18 @@ model {
   
   sal.v ~ dgamma(10, 100)
   
-  po4.v ~ dgamma(10, 500)
+  po4.v ~ dgamma(10, 5e3)
   
-  rm.v ~ dgamma(10, 1000)
+  rm.v ~ dgamma(10, 1e4)
 
   # Global
   for(i in 2:n.steps){
     # pCO2 (uatm)
     pCO2[i] ~ dgamma(pCO2[i - 1] ^ 2 / pCO2.v, pCO2[i - 1] / pCO2.v)
     
-    # d13C of aqueous CO2 (per mille)
-    d13C.co2[i] = d13C.co2[i - 1] + d13C.co2.eps[i]
-    d13C.co2.eps[i] ~ dnorm(d13C.co2.eps[i - 1] * d13C.co2.phi ^ dt, 
-                         d13C.co2.pc[i])
-    d13C.co2.pc[i] = d13C.co2.tau * ((1 - d13C.co2.phi ^ 2) / 
-                                   (1 - d13C.co2.phi ^ (2 * dt)))
+    ### d13Ca
+    d13Ca[i] = d13Ca[i - 1] + d13Ca.eps[i]
+    d13Ca.eps[i] ~ dnorm(d13Ca.eps[i - 1] * (d13Ca.phi ^ dt), d13Ca.pc)
     
     # Global MAT in degrees C
     MAT[i] = MAT[i - 1] + MAT.eps[i]
@@ -165,8 +160,8 @@ model {
   pCO2[1] = pCO2.s * 1e3
   pCO2.s ~ dunif(0.3, 1.5)
   
-  d13C.co2.eps[1] = 0
-  d13C.co2[1] ~ dunif(-8, -3)
+  d13Ca.eps[1] = 0
+  d13Ca[1] ~ dunif(-8, -3)
   
   MAT[1] ~ dunif(10, 20)
   MAT.eps[1] = 0
@@ -174,8 +169,9 @@ model {
   ## Priors
   pCO2.v ~ dgamma(10, 1e-2)
   
-  d13C.co2.phi ~ dbeta(5, 2)
-  d13C.co2.tau ~ dgamma(5, 1e-2)
+  d13Ca.pc = d13Ca.tau * ((1 - d13Ca.phi ^ 2) / (1 - d13Ca.phi ^ (2 * dt)))
+  d13Ca.phi ~ dbeta(5, 2)
+  d13Ca.tau ~ dgamma(5, 1e-2)
   
   MAT.tau ~ dgamma(10, 1)
   MAT.phi ~ dbeta(2, 5)
@@ -198,12 +194,6 @@ model {
   
   # cell wall permeability to CO2(aq) in m/s, post-calibration
   P.c ~ dgamma(4.539e-5 ^ 2 / 1.4e-6 ^ 2, 4.539e-5 / 1.4e-6 ^ 2)
-  
-  # Uk'37 temperature calibration (Conte et al., 2006; sediment - AnnO linear model) 
-  # with 1.1C = reported se of estimation
-  Uk.sl = 29.876
-  Uk.int = 1.334
-  Uk.cal.se = 1.1
   
   # gas constant in J / K*mol
   R.gc = 8.3143

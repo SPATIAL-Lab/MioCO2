@@ -169,13 +169,13 @@ n.lith <- length(lith.keep)
 # If there are no lith observations, pass one effectively uninformative row so JAGS can compile.
 if (n.lith < 1){
   n.lith <- 1
-  lith.data <- lith.m*1.5 + lith.b
-  lith.data.sd <- 1e6
-  lith.state.index <- 1
-} else {
-  lith.data <- prox.in$len.lith.data[lith.keep]
-  lith.data.sd <- prox.in$len.lith.data.sd[lith.keep]
-  lith.state.index <- lith.keep
+  lith.obs = data.frame("lith.obs" = lith.m * 1.5 + lith.b,
+                                "lith.obs.sd" = 1e6)
+  li = 1
+} else{
+  lith.obs = data.frame("lith.obs" = prox.in$len.lith.data[lith.keep],
+                                "lith.obs.sd" = prox.in$len.lith.data.sd[lith.keep])
+  li = lith.keep
 }
 
 # Collapse environmental priors to state level, while retaining every observation in the likelihood.
@@ -208,9 +208,8 @@ data.pass <- list("n.obs" = n.obs,
                   "d13Ca.obs" = prox.in$d13Ca.obs,
                   "temp.obs" = prox.in$temp.obs,
                   "po4.obs" = prox.in$po4.obs,
-                  "len.lith.data" = lith.data,
-                  "len.lith.data.sd" = lith.data.sd,
-                  "lith.state.index" = lith.state.index)
+                  "lith.obs" = lith.obs,
+                  "li" = li)
 ############################################################################################
 
 
@@ -225,14 +224,15 @@ parms <- c("tempC", "sal", "pCO2", "d13C.co2", "d13Ca", "po4", "rm", "b",
 ############################################################################################
 post.phyto <- jags.parallel(data = data.pass, model.file = "code/models/phyto.R", 
                          parameters.to.save = parms, inits = NULL, n.chains = 3, 
-                         n.iter = 2e5, n.burnin = 1e5, n.thin = 100)
+                         n.iter = 5e3, n.burnin = 2e3, n.thin = 1)
 ############################################################################################
 
 View(post.phyto$BUGSoutput$summary)
 
 plot(prox.in$age, post.phyto$BUGSoutput$median$pCO2)
+plot(prox.in$age, post.phyto$BUGSoutput$median$d13Ca)
 plot(data.pass$d13Ca.obs[, 1], post.phyto$BUGSoutput$median$d13C.co2)
-plot(data.pass$d13Cmarker.obs[, 1] - data.pass$d13Ca.obs[ai, 1], post.phyto$BUGSoutput$median$pCO2)
+plot(data.pass$d13Cmarker.obs[, 1] - data.pass$d13Ca.obs[, 1], post.phyto$BUGSoutput$median$pCO2)
 plot(post.phyto$BUGSoutput$median$rm, post.phyto$BUGSoutput$median$pCO2)
 
 # Timeseries inversion
@@ -282,16 +282,15 @@ data.pass <- list("n.obs" = n.obs,
                   "d13Ca.obs" = d13Ca.obs,
                   "temp.obs" = prox.in$temp.obs,
                   "po4.obs" = prox.in$po4.obs,
-                  "len.lith.data" = lith.data,
-                  "len.lith.data.sd" = lith.data.sd,
-                  "lith.state.index" = lith.state.index)
+                  "lith.obs" = lith.obs,
+                  "li" = li)
 ############################################################################################
 
 # Run the inversion using jags
 ############################################################################################
 post.phyto.ts <- jags.parallel(data = data.pass, model.file = "code/models/phyto_ts.R", 
                          parameters.to.save = parms, inits = NULL, n.chains = 3, 
-                         n.iter = 1e4, n.burnin = 5e3, n.thin = 1)
+                         n.iter = 2e4, n.burnin = 5e3, n.thin = 10)
 ############################################################################################
 
 View(post.phyto.ts$BUGSoutput$summary)
@@ -299,17 +298,7 @@ View(post.phyto.ts$BUGSoutput$summary)
 tsplot(ages, post.phyto.ts, "pCO2")
 pointplot(prox.in$age, post.phyto, "pCO2")
 
-plot(ages, post.phyto.ts$BUGSoutput$median$rm[1,] , ylim = c(1, 5), type = "l")
-for(i in 2:n.sites){
-  lines(ages, post.phyto.ts$BUGSoutput$median$rm[i,])
-}
-
-plot(ages, post.phyto.ts$BUGSoutput$median$po4[1,] , ylim = c(0.1, 2), type = "l")
-for(i in 2:n.sites){
-  lines(ages, post.phyto.ts$BUGSoutput$median$po4[i,])
-}
-
 plot(data.pass$d13Cmarker.obs[, 1] - data.pass$d13Ca.obs[ai, 1], post.phyto.ts$BUGSoutput$median$pCO2[ai])
-plot(data.pass$d13Cmarker.data - data.pass$d13Ca.obs[ai, 1], post.phyto$BUGSoutput$median$pCO2)
+plot(data.pass$d13Cmarker.obs[, 1] - data.pass$d13Ca.obs[ai, 1], post.phyto$BUGSoutput$median$pCO2)
 
 save(post.phyto, post.phyto.ts, file = "bigout/phyto.rda")

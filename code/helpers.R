@@ -1,4 +1,4 @@
-parseFranks = function(d, condense = TRUE, fixA = FALSE){
+parseFranks = function(d, ages, condense = TRUE, fixA = FALSE){
   # Parse values from sheet, obs, parameters, constants
 
   # Drop aggregate estimate rows based on missing stomatal density
@@ -19,9 +19,9 @@ parseFranks = function(d, condense = TRUE, fixA = FALSE){
   }
   
   # Free parameters
-  mp.names = c("d13Ca.obs", "A0", "CiCa0", "gb", "s1", "s2", "s3",
+  mp.names = c("A0", "CiCa0", "gb", "s1", "s2", "s3",
                "s4", "s5")
-  mp.sd = c(0.5, 0.25, 0.05, 0.05, 0.001, 0.05, 0.01, 0.01, 0.001)
+  mp.sd = c(0.25, 0.05, 0.05, 0.001, 0.05, 0.01, 0.01, 0.001)
   
   for(i in seq_along(mp.names)){
     ci = match(mp.names[i], names(d))
@@ -45,7 +45,7 @@ parseFranks = function(d, condense = TRUE, fixA = FALSE){
     } else{
       d.sub = d[, ci]
     }
-    data[[i + 16]] = d.sub
+    data[[i + 15]] = d.sub
   }
   
   names(data) = c(data.names, mp.names, c.names)
@@ -66,25 +66,21 @@ parseFranks = function(d, condense = TRUE, fixA = FALSE){
   names(data$Ci0) = c("Ci0", "eCi0")
   data = data[!(names(data) %in% c("CiCa0", "CO2_0"))]
   
+  # Age index
+  data$ai.plant = rep(0)
+  for(i in seq_along(d$age_mean)){
+    data$ai.plant[i] = which.min(abs(d$age_mean[i] - ages))
+  }
+  
   # Condense sites and taxa
   if(condense){
-    ## Sites index
-    ci = match("ai", names(d))
-    strats = unique(d[, ci])
-    data$level = match(d[, ci], strats)
-    
-    ## Condense site level parameters
-    ### First occurrence of each strat level
-    fo = match(strats, d[, ci])
-    data$d13Ca.obs = data$d13Ca.obs[fo, ]
-    
     ## Taxa index
     ### Collect unknowns and assign dummy names to them
     d$genus[d$genus == "unknown"] = NA
     d$genus[is.na(d$genus)] = seq(sum(is.na(d$genus)))
     
     genera = unique(d$genus)
-    data$genus = match(d$genus, genera)
+    data$gi = match(d$genus, genera)
     
     ## Condense species level parameters
     ### First occurrence of each species
@@ -99,8 +95,10 @@ parseFranks = function(d, condense = TRUE, fixA = FALSE){
     data$s3 = data$s3[fo, ]
     data$s2 = data$s2[fo, ]
   } else{
-    data$genus = data$level = seq_len(nrow(d))
+    data$gi = data$ai.plant = seq_len(nrow(d))
   }
+  
+  data$n.gen = length(unique(data$gi))
   
   return(data)
 }
@@ -235,7 +233,7 @@ tsdens = function(d, col = "black"){
 }
 
 # Make probability envelope plot
-tsplot = function(a, d, v, col = "black"){
+tsplot = function(a, d, v, col = "black", ylim = NA, add = FALSE){
   if(!inherits(d, "rjags")){
     stop("d must be rjags object")
   }
@@ -253,10 +251,15 @@ tsplot = function(a, d, v, col = "black"){
   
   d = cbind(a, t(d))
   
-  xlim = range(d[, 1])
-  ylim = range(d[, 2:6])
-  plot(0, 0, type = "n", xlim = rev(xlim), ylim = ylim, xlab = "Age (Mya)",
-       ylab = v)
+  if(!add){
+    if(is.na(sum(ylim))){
+      ylim = range(d[, 2:6])
+    }
+    
+    xlim = range(d[, 1])
+    plot(0, 0, type = "n", xlim = rev(xlim), ylim = ylim, xlab = "Age (Mya)",
+         ylab = v)
+  }
   
   tsdens(d, col)
 }
@@ -283,7 +286,7 @@ pointplot = function(a, d, v, col = "black"){
   points(a, d[, 2], pch = 21, col = col, bg = "white")
 }
 
-parseSoil = function(d, condense = TRUE){
+parseSoil = function(d, ages, condense = TRUE){
   # Parse values from sheet, obs, parameters, constants
   
   # Current data structure
@@ -296,26 +299,26 @@ parseSoil = function(d, condense = TRUE){
   ## age
   ## site
   
-  data = list()
+  data.pass = list()
   
   # d13Cc
   ci = match("d13C_cc", names(d))
   d.sub = d[, ci:(ci + 1)]
   d.sub[, 2] = d.sub[, 2] / 2
-  data$d13Cc.obs = d.sub
+  data.pass$d13Cc.obs = d.sub
 
   # d13Co
   ## Need to accommodate other OM types
   ci = match("d13Com_occluded", names(d))
   d.sub = d[, ci:(ci + 1)]
   d.sub[, 2] = d.sub[, 2] / 2
-  data$d13Co.obs = d.sub
+  data.pass$d13Co.obs = d.sub
   
   # MAT
   ci = match("tempC", names(d))
   d.sub = d[, ci:(ci + 1)]
   d.sub[, 2] = d.sub[, 2] / 2
-  data$MAT.obs = d.sub
+  data.pass$temp.obs.soil = d.sub
   
   # MAP
 #  ci = match("d13C_cc", names(d))
@@ -324,26 +327,219 @@ parseSoil = function(d, condense = TRUE){
 #  data$MAP.obs = d.sub
 
   # lat
-  data$lat = d$lat
-  
-  # age index
-  data$ai = d$ai
-  
-  # site index
-  data$si = d$si
+  data.pass$lat.soil = d$lat
   
   # number of data
-  data$nd = nrow(d)
+  data.pass$n.obs.soil = nrow(d)
+  
+  # Age index
+  data.pass$ai.soil = rep(0)
+  for(i in seq_along(d$age_mean)){
+    data.pass$ai.soil[i] = which.min(abs(d$age_mean[i] - ages))
+  }
+  
+  ## Sites index
+  sites = unique(d$lat)
+  data.pass$si.soil = rep(0)
+  for(i in seq_along(sites)){
+    data.pass$si.soil[d$lat == sites[i]] = i
+  }
+  data.pass$n.sites.soil = length(sites)
   
   # Condense sites, add condense ages
   if(condense){
     ## Condense site level parameters
     ### First occurrence of each strat level
-    sites = unique(d$si)
-    fo = match(sites, d$si)
-    data$lat = d$lat[fo]
-    
+    sites = unique(data.pass$si.soil)
+    fo = match(sites, data.pass$si.soil)
+    data.pass$lat.soil = d$lat[fo]
   }
   
-  return(data)
+  return(data.pass)
+}
+
+parsePhyto = function(d, ages){
+
+  tempC.lb <- 0
+  tempC.ub <- 65
+  sal.lb <- 15
+  sal.ub <- 60
+  
+  # Step increments for sal (ppt) temp (degrees C) and press (bar)
+  t.inc <- 0.25
+  s.inc <- 0.25
+  
+  # Ranges of variables over which to evaluate
+  tempC.vr <- seq(tempC.lb, tempC.ub, by=t.inc)
+  sal.vr <- seq(sal.lb, sal.ub, by=s.inc)
+  
+  # Initiate arrays
+  temp.vr <- c(1:length(tempC.vr))
+  base2Darray <- c(1:(length(tempC.vr)*length(sal.vr)))
+  dim(base2Darray) <- c(length(tempC.vr), length(sal.vr))
+  Ksw_sta <- base2Darray
+  K0a <- base2Darray
+  
+  # Constant (cm^3 bar mol^-1 K^-1)
+  R <- 83.131
+  
+  # Calculate 2D array for K0 and Ksw (temp and sal dependent)
+  for (i in 1:length(tempC.vr)){
+    for (j in 1:length(sal.vr)){
+      temp.vr[i] <- tempC.vr[i]+273.15
+      Ksw_sta[i,j] <- exp(148.96502-13847.26/temp.vr[i]-23.6521*(log(temp.vr[i]))+(118.67/temp.vr[i]-5.977+1.0495*(log(temp.vr[i])))*(sal.vr[j]^0.5)-0.01615*sal.vr[j])
+      K0a[i,j] <- exp(9345.17/temp.vr[i]-60.2409+23.3585*(log(temp.vr[i]/100))+sal.vr[j]*(0.023517-0.00023656*temp.vr[i]+0.0047036*((temp.vr[i]/100)^2)))
+    }
+  }
+  
+  n.temp <- nrow(K0a)
+  n.sal <- ncol(K0a)
+
+  # Size-based transfer function - Henderiks and Pagani 07 data
+  lith.m = 1.859568
+  lith.b = 0.3544168
+
+  num <- function(x) suppressWarnings(as.numeric(x))
+  
+  mean_or_range <- function(x, xmin=NULL, xmax=NULL, default=NA){
+    x <- num(x)
+    
+    if (!is.null(xmin) & !is.null(xmax)){
+      x.range <- (num(xmin)+num(xmax))/2
+      x <- ifelse(!is.na(x), x, x.range)
+    }
+    
+    ifelse(!is.na(x), x, default)
+  }
+  
+  sd_or_range <- function(x2s, xmin=NULL, xmax=NULL, default){
+    x <- num(x2s)/2
+    
+    if (!is.null(xmin) & !is.null(xmax)){
+      x.range <- (num(xmax)-num(xmin))/4
+      x <- ifelse(!is.na(x), x, x.range)
+    }
+    
+    ifelse(!is.na(x) & x > 0, x, default)
+  }
+
+  # Pull out the intermediate-sheet variables needed by the discrete PSM
+  sample.id <- as.character(d$sample)
+  sample.id <- ifelse(is.na(sample.id) | sample.id == "", paste0("sample_", seq_along(sample.id)), sample.id)
+  lat <- num(d$lat)
+  lon <- num(d$lon)
+  lon <- ((lon + 180) %% 360) - 180
+  age.mean <- mean_or_range(d$age_mean, d$age_min, d$age_max)
+  
+  d13Cmarker.mean <- mean_or_range(d$d13Corg_mean, d$d13Corg_min, d$d13Corg_max)
+  d13Cmarker.sd <- sd_or_range(d$d13Corg_2s, d$d13Corg_min, d$d13Corg_max, 1)
+  
+  tempC.mean <- mean_or_range(d$tempC, d$tempC_min, d$tempC_max, 25)
+  tempC.sd <- sd_or_range(d$tempC_2s, d$tempC_min, d$tempC_max, 5)
+  
+  po4.mean <- mean_or_range(d$po4_mean, d$po4_min, d$po4_max, 1.5)
+  po4.sd <- sd_or_range(d$po4_2s, d$po4_min, d$po4_max, 0.25)
+  
+  lith.mean <- mean_or_range(d$lith_mean, d$lith_min, d$lith_max)
+  lith.sd <- sd_or_range(d$lith_2s, d$lith_min, d$lith_max, 0.5)
+  
+  prox.in <- data.frame(sample = sample.id,
+                        lat = lat,
+                        lon = lon,
+                        age = age.mean,
+                        po4.prior = po4.mean,
+                        po4.prior.sd = po4.sd,
+                        tempC.prior = tempC.mean,
+                        tempC.prior.sd = tempC.sd,
+                        d13Cmarker.data = d13Cmarker.mean,
+                        d13Cmarker.data.sd = d13Cmarker.sd,
+                        len.lith.data = lith.mean,
+                        len.lith.data.sd = lith.sd,
+                        stringsAsFactors = FALSE)
+  
+  prox.in <- prox.in[complete.cases(prox.in[,c("sample", "lat", "lon", "age", 
+                                               "po4.prior", "po4.prior.sd",
+                                               "tempC.prior", "tempC.prior.sd", 
+                                               "d13Cmarker.data",
+                                               "d13Cmarker.data.sd")]),]
+  prox.in = prox.in[prox.in$age < 25 & prox.in$age > 5, ]
+  n.obs <- nrow(prox.in)
+  
+  ## Proxy data input
+  temp.obs = data.frame("temp.m" = prox.in$tempC.prior,
+                        "temp.sd" = prox.in$tempC.prior.sd)
+  
+  po4.obs = data.frame("po4.m" = prox.in$po4.prior,
+                       "po4.sd" = prox.in$po4.prior.sd)
+  
+  d13Cmarker.obs = data.frame("d13Cmarker.m" = prox.in$d13Cmarker.data, 
+                              "d13Cmarker.sd" = prox.in$d13Cmarker.data.sd)
+  
+  # Build compact observation vectors. Marker observations are required; lith observations are used only where present.
+  lith.keep <- which(!is.na(prox.in$len.lith.data) & !is.na(prox.in$len.lith.data.sd) & 
+                       prox.in$len.lith.data.sd > 0)
+  
+  n.lith <- length(lith.keep)
+  
+  # If there are no lith observations, pass one effectively uninformative row so JAGS can compile.
+  if (n.lith < 1){
+    n.lith <- 1
+    lith.obs = data.frame("lith.obs" = lith.m * 1.5 + lith.b,
+                          "lith.obs.sd" = 1e6)
+    li = 1
+  } else{
+    lith.obs = data.frame("lith.obs" = prox.in$len.lith.data[lith.keep],
+                          "lith.obs.sd" = prox.in$len.lith.data.sd[lith.keep])
+    li = lith.keep
+  }
+
+  # Parameters to save as output
+  parms <- c("tempC", "sal", "pCO2", "d13C.co2", "d13Ca", "po4", "rm", "b",
+             "eps.p", "d13Cmarker", "len.lith", "coeff.po4", "coeff.rm")
+  
+  ## Age index
+  ai = numeric(nrow(prox.in))
+  for(i in seq_along(prox.in$age)){
+    ai[i] = which.min(abs(prox.in$age[i] - ages))
+  }
+  
+  ## Site index
+  sites = unique(prox.in$lat + prox.in$lon)
+  si = match(prox.in$lat + prox.in$lon, sites)
+  
+  # Select data to pass to jags
+  data.pass <- list("n.obs.alk" = n.obs,
+                    "n.lith" = n.lith,
+                    "n.sites.alk" = length(sites),
+                    "n.temp" = n.temp,
+                    "n.sal" = n.sal,
+                    "ai.alk" = ai,
+                    "si.alk" = si,
+                    "lith.m" = lith.m,
+                    "lith.b" = lith.b,
+                    "K0a" = K0a,
+                    "Ksw_sta" = Ksw_sta,
+                    "sal.lb" = sal.lb,
+                    "tempC.lb" = tempC.lb,
+                    "t.inc" = t.inc,
+                    "s.inc" = s.inc,
+                    "d13C.obs.alk" = d13Cmarker.obs,
+                    "temp.obs.alk" = temp.obs,
+                    "po4.obs" = po4.obs,
+                    "lith.obs" = lith.obs,
+                    "li" = li)
+  
+  return(data.pass)
+}
+
+parseAtmos = function(d, ages){
+  
+  d13Ca.obs = data.frame("d13Ca" = numeric(length(ages)),
+                         "d13Ca.sd" = numeric(length(ages)))
+  for(i in seq_along(ages)){
+    d13Ca.obs[i, 1] = d$d13Ca_50[which.min(abs(ages[i] - d$age))]
+    d13Ca.obs[i, 2] = d$sd[which.min(abs(ages[i] - d$age))]
+  }
+  
+  return(list("d13Ca.obs" = d13Ca.obs))
 }

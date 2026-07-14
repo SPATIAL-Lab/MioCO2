@@ -301,9 +301,7 @@ model{
   
   ## Priors
   pCO2.v ~ dgamma(10, 1e-2)
-#  pCO2.tau ~ dgamma(10, 1e3) 
-#  pCO2.phi ~ dbeta(2, 5)
-  
+
   d13Ca.phi ~ dbeta(5, 2)
   d13Ca.tau ~ dgamma(5, 1e-2)
   

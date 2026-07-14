@@ -12,8 +12,7 @@ model {
   }
   
   for(i in 1:n.lith){
-    len.lith.data[i] ~ dnorm(len.lith[lith.state.index[i]], 
-                             1 / len.lith.data.sd[i] ^ 2)
+    lith.obs[i, 1] ~ dnorm(len.lith[li[i]], 1 / lith.obs[i, 2] ^ 2)
   }
   ############################################################################################
   
@@ -26,8 +25,8 @@ model {
     temp[i] = tempC[i] + 273.15
     
     # Pull K0 and Ksw from driver look up tables
-    t.index[i] = min(max(round((tempC[i]-tempC.lb)/t.inc)+1, 1), n.temp)
-    s.index[i] = min(max(round((sal[i]-sal.lb)/s.inc)+1, 1), n.sal)
+    t.index[i] = min(max(round((tempC[i] - tempC.lb) / t.inc) + 1, 1), n.temp)
+    s.index[i] = min(max(round((sal[i] - sal.lb) / s.inc) + 1, 1), n.sal)
     K0[i] = K0a[t.index[i], s.index[i]]
     Ksw.noP[i] = Ksw_sta[t.index[i], s.index[i]]
     
@@ -36,10 +35,10 @@ model {
     co2[i] = fco2[i] * K0[i] * 1e-3 # mol/m^3 (uM)
     
     # Calculate length of the coccolith from mean radius (rm)
-    len.lith[i] = lith.m * (rm[i] * 1e6) + lith.b # in um
+    len.lith[i] = lith.m * rm[i] + lith.b # in um
     
     # Calculate cell carbon content
-    cell.vol.um[i] = 4 / 3 * 3.141593 * ((rm[i] * 1e6) ^ 3) # in um^3
+    cell.vol.um[i] = 4 / 3 * 3.141593 * rm[i] ^ 3 # in um^3
     gam.c[i] = 1.46e-14 * cell.vol.um[i]
     
     # Calculate DT (temperature-sensitive diffusivity of C02(aq)in seawater) from SST using eqn. 8 of Rau et al. (1996)
@@ -65,26 +64,26 @@ model {
     
     # Calculate Qs (the co2 flux into the cell per unit surface area of the cell membrane)
     Qr[i] = mui[i] / log(2) * gam.c[i]
-    Qs[i] = Qr[i] / (4 * 3.141593 * (rm[i] ^ 2))
+    Qs[i] = Qr[i] / (4 * 3.141593 * ((rm[i] * 1e-6) ^ 2))
     
     # Calculate b in uM from Qs, rmean, rK, DT, Pc, eps.f and eps.d using eqn. 15 of Rau et al (1996)
-    b[i] = ((eps.f - eps.d) * Qs[i] * ((rm[i] / ((1 + rm[i] / rk[i]) * DT[i])) 
+    b[i] = ((eps.f - eps.d) * Qs[i] * 
+              ((rm[i] * 1e-6 / ((1 + rm[i] * 1e-6 / rk[i]) * DT[i])) 
                                        + 1 / P.c)) * 1e3
     
     # Calculate eps.p from [CO2](aq), eps.f and b
     eps.p[i] = eps.f - (b[i] / (co2[i] * 1e3))
     
-    # Calculate d13C.biomass from d13C.co2 and epsilon.p (eqn 2)
-    d13C.biomass[i] = ((d13C.co2[i] + 1e3) / ((eps.p[i] / 1e3) + 1)) - 1e3
-    
-    # Calculate d13C.marker from d13C.biomass (eqn 22)
-    d13Cmarker[i] = ((d13C.biomass[i] + 1e3) / ((eps.bob/1e3) + 1)) - 1e3
-    
-    # Calculate d13Ca from d13C.co2
+    ### Calculate d13C.co2 from d13Ca
     eps.co2.aq.g[i] = -373 / temp[i] + 0.19
     alpha.co2.aq.g[i] = 1 + eps.co2.aq.g[i] / 1e3
-    d13Ca[i] = (d13C.co2[i] + 1e3) / alpha.co2.aq.g[i] - 1e3
+    d13C.co2[i] = d13Ca[i] * alpha.co2.aq.g[i] + eps.co2.aq.g[i]
+
+    # Calculate d13C.biomass from d13C.co2 and epsilon.p (eqn 2)
+    d13C.biomass[i] = d13C.co2[i] / (1 + eps.p[i] / 1e3) - eps.p[i]
     
+    # Calculate d13C.marker from d13C.biomass (eqn 22)
+    d13Cmarker[i] = d13C.biomass[i] / (1 + eps.bob / 1e3) - eps.bob
   }
   ############################################################################################
   
@@ -104,13 +103,14 @@ model {
     ca.s[i] ~ dunif(0.1, 2)  
     
     # d13C of aqueous CO2 (per mille)
-    d13C.co2[i] ~ dunif(-8, -3)
+    d13Ca[i] ~ dunif(-8, -3)
     
     # Concentration of phosphate (PO4; umol/kg)
-    po4[i] ~ dgamma(po4.obs[i, 1] ^ 2 / po4.obs[i, 2], po4.obs[i, 1] / po4.obs[i, 2])
+    po4[i] ~ dgamma(po4.obs[i, 1] ^ 2 / po4.obs[i, 2] ^ 2, 
+                    po4.obs[i, 1] / po4.obs[i, 2] ^ 2)T(0.1, 2)
     
     # Mean cell radius (m)
-    rm[i] ~ dgamma(1.5 ^ 2 / 0.25, 1.5 / 0.25)T(1, 5)
+    rm[i] ~ dgamma(1.5 ^ 2 / 0.25 ^ 2, 1.5 / 0.25 ^ 2)T(1, 5)
   }
   ############################################################################################
  
@@ -132,12 +132,6 @@ model {
   # cell wall permeability to CO2(aq) in m/s, post-calibration
   P.c ~ dgamma(4.539e-5 ^ 2 / 1.4e-6 ^ 2, 4.539e-5 / 1.4e-6 ^ 2)
   
-  # Uk'37 temperature calibration (Conte et al., 2006; sediment - AnnO linear model) 
-  # with 1.1C = reported se of estimation
-  Uk.sl = 29.876
-  Uk.int = 1.334
-  Uk.cal.se = 1.1
-  
   # gas constant in J / K*mol
   R.gc = 8.3143
   
@@ -150,7 +144,7 @@ model {
   coeff.po4 = 1.998e-6
   
   # Coefficient for radius - PO4 multi linear regression, post-calibration
-  coeff.rm = -20
+  coeff.rm = -20e-6
   
   # Coefficient for y intercept for mu(i) multi linear regression
   mui.y.int = 4.011e-5
