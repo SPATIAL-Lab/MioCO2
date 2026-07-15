@@ -54,37 +54,52 @@ if(length(pf.p) > 1){
   }
 }
 
-
 data.pass = append(data.pass, parseFranks(pd.p, ages))
 
-parms = c("pCO2", "d13Ca", "MAT", "MAP", "S_z", "b", "pCO2.eps.ac")
+parms = c("pCO2", "d13Ca", "MAT", "MAP", "S_z", "b", "pCO2.v")
 
 post.ts = jags.parallel(data.pass, NULL, parms, "code/models/joint_ts.R", 
-                        n.chains = 3, n.iter = 6e3, n.burnin = 3e3)
+                        n.chains = 5, n.iter = 1e5, n.burnin = 5e4, 
+                        n.thin = 50)
 
 data.pass.natmos = data.pass
 data.pass.natmos$d13Ca.obs[, 2] = rep(1e3)
 post.ts.natmos = jags.parallel(data.pass.natmos, NULL, parms, "code/models/joint_ts.R", 
-                           n.chains = 3, n.iter = 6e3, n.burnin = 3e3)
+                           n.chains = 5, n.iter = 2e4, n.burnin = 1e4, 
+                           n.thin = 10)
 
 data.pass.nalk = data.pass
 data.pass.nalk$d13C.obs.alk[, 2] = rep(1e3)
 post.ts.nalk = jags.parallel(data.pass.nalk, NULL, parms, "code/models/joint_ts.R", 
-                           n.chains = 3, n.iter = 6e3, n.burnin = 3e3)
+                           n.chains = 5, n.iter = 2e4, n.burnin = 1e4, 
+                           n.thin = 10)
 
 data.pass.nsoil = data.pass
 data.pass.nsoil$d13Cc.obs[, 2] = rep(1e3)
 post.ts.nsoil = jags.parallel(data.pass.nsoil, NULL, parms, "code/models/joint_ts.R", 
-                           n.chains = 3, n.iter = 6e3, n.burnin = 3e3)
+                           n.chains = 5, n.iter = 2e4, n.burnin = 1e4, 
+                           n.thin = 10)
 
 data.pass.nplant = data.pass
 data.pass.nplant$d13Cp[, 2] = rep(1e3)
 post.ts.nplant = jags.parallel(data.pass.nplant, NULL, parms, "code/models/joint_ts.R", 
-                              n.chains = 3, n.iter = 6e3, n.burnin = 3e3)
+                              n.chains = 5, n.iter = 2e4, n.burnin = 1e4, 
+                              n.thin = 10)
 
 View(post.ts$BUGSoutput$summary)
 
-tsplot(ages, post.ts, "pCO2", ylim = c(150, 1500))
+save(post.ts, file = "bigout/post.rda")
+save(post.ts.natmos, file = "bigout/post_natmos.rda")
+save(post.ts.nalk, file = "bigout/post_nalk.rda")
+save(post.ts.nsoil, file = "bigout/post_nsoil.rda")
+save(post.ts.nplant, file = "bigout/post_nplant.rda")
+
+
+tsplot(ages, post.ts, "pCO2")
+tsplot(ages, post.ts.natmos, "pCO2")
+tsplot(ages, post.ts.nalk, "pCO2")
+tsplot(ages, post.ts.nsoil, "pCO2")
+tsplot(ages, post.ts.nplant, "pCO2")
 
 tsplot(ages, post.phyto.ts, "pCO2", col = "lightblue", add = TRUE)
 tsplot(ages, post.plants.ts, "pCO2", col = "green3", add = TRUE)

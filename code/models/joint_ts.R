@@ -469,9 +469,9 @@ model {
   ## Global
   for(i in 2:n.steps){
     ### pCO2 (uatm)
-#    pCO2[i] ~ dgamma(pCO2[i - 1] ^ 2 / pCO2.v, pCO2[i - 1] / pCO2.v)
-    pCO2[i] = pCO2[i-1] + pCO2.eps[i]
-    pCO2.eps[i] ~ dnorm(pCO2.eps[i-1] * pCO2.eps.ac, pCO2.pre) 
+    pCO2[i] ~ dgamma(pCO2[i - 1] ^ 2 / pCO2.v, pCO2[i - 1] / pCO2.v)
+#    pCO2[i] = pCO2[i-1] + pCO2.eps[i]
+#    pCO2.eps[i] ~ dnorm(pCO2.eps[i-1] * pCO2.eps.ac, pCO2.pre) 
     
     ### d13Ca
     d13Ca[i] = d13Ca[i - 1] + d13Ca.eps[i]
@@ -485,7 +485,7 @@ model {
   ### Initial conditions
   pCO2[1] = pCO2.s * 1e3
   pCO2.s ~ dunif(0.25, 1)
-  pCO2.eps[1] = 0
+#  pCO2.eps[1] = 0
   
   d13Ca.eps[1] = 0
   d13Ca[1] ~ dunif(-8, -3)
@@ -494,9 +494,9 @@ model {
   MAT.eps[1] = 0
   
   ### Priors
-#  pCO2.v ~ dgamma(10, 1e-2)
-  pCO2.eps.ac ~ dunif(0.5, 0.99)
-  pCO2.pre ~ dgamma(1, 0.1)
+  pCO2.v ~ dgamma(10, 1)
+#  pCO2.eps.ac ~ dunif(0.5, 0.99)
+#  pCO2.pre ~ dgamma(1, 0.1)
   
   d13Ca.pc = d13Ca.tau * ((1 - d13Ca.phi ^ 2) / (1 - d13Ca.phi ^ (2 * dt)))
   d13Ca.phi ~ dbeta(5, 2)
