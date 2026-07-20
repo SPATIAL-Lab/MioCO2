@@ -10,51 +10,8 @@ load("bigout/soils.rda")
 stepsize = 0.1
 ages = seq(25 - stepsize / 2, 5 - stepsize / 2, by = -stepsize)
 
-# Initialize data.pass
-data.pass = list("dt" = stepsize)
-data.pass$n.steps = length(ages)
-
-# Add atmospheric data
-d13Ca = read.csv("data/d13Ca_Cenozoic.csv")
-d13Ca$sd = (d13Ca$d13Ca_97p5 - d13Ca$d13Ca_2p5) / 2
-
-data.pass = append(data.pass, parseAtmos(d13Ca, ages))
-
-# Alkenones
-# Load proxy data for reconstruction from intermediate workbook
-prox.raw <- read.xlsx("data/proxyData/phyto_Intermediate_combined.xlsx", 
-                      sheet = "data4PSM", startRow = 4, 
-                      na.strings = c("", "NA", "#N/A"))
-names(prox.raw) <- trimws(names(prox.raw))
-
-# Testing...
-prox.raw = prox.raw[prox.raw$sample != "phytoplankton_Bolton_2016_13", ]
-
-data.pass = append(data.pass, parsePhyto(prox.raw, ages))
-
-# Soils
-pf = list.files("data/proxyData/", full.names = TRUE)
-pf.s = pf[grep("paleosol", pf)]
-pd.s = read.xlsx(pf.s[1], 1, startRow = 4)
-
-data.pass = append(data.pass, parseSoil(pd.s, ages))
-
-# Plants
-pf = list.files("data/proxyData/", full.names = TRUE)
-pf.p = pf[grep("stomata", pf)]
-
-## First file
-pd.p = read.xlsx(pf.p[1], 1, startRow = 4)
-
-## Others
-if(length(pf.p) > 1){
-  for(i in pf.p[2:length(pf.p)]){
-    pd.p.a = read.xlsx(i, 1, startRow = 4)
-    pd.p = rbind(pd.p, pd.p.a)
-  }
-}
-
-data.pass = append(data.pass, parseFranks(pd.p, ages))
+# Load data
+data.pass = loadTS(ages)
 
 parms = c("pCO2", "d13Ca", "MAT", "MAP", "S_z", "b", "pCO2.v")
 

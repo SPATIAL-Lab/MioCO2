@@ -29,25 +29,24 @@ d13Ca$age = as.integer(d13Ca$a * 100, 0) / 100
 ## Age index in 100kyr bins
 pd.p$ai = round(pd.p$age_mean * 10, 0)
 
-## Add d13Ca to dataset
-pd.p$d13Ca.obs = d13Ca$d13Ca_50[pd.p$ai]
-pd.p$ed13Ca = d13Ca$sd[pd.p$ai]
-
 ## Parse
-pd.p.l = parseFranks(pd.p)
+pd.p.l = parseFranks(pd.p, unique(round(pd.p$age_mean, 1)))
+
+## Add d13Ca to dataset
+pd.p.l$d13Ca.obs = data.frame(d13Ca$d13Ca_50[unique(pd.p$ai)], d13Ca$sd[unique(pd.p$ai)])
 
 ## Site ages for plotting
 siteAges = d13Ca$age[unique(pd.p$ai)]
 
 # Run independent sample inversion ----
 ## Parameters to save
-parms = c("pCO2", "d13Ca")
+parms = c("pCO2", "d13Ca", "A")
 
 post.plants = jags.parallel(pd.p.l, NULL, parms, "code/models/plant.R", 
-                     n.chains = 3, n.iter = 3e5, n.burnin = 1e5, n.thin = 1e2)
+                     n.chains = 3, n.iter = 1e5, n.burnin = 1e4, n.thin = 1e2)
 
 View(post.plants$BUGSoutput$summary)
-plot(d13Ca$age[unique(pd.p$ai)], post.plants$BUGSoutput$median$pCO2)
+plot(siteAges, post.plants$BUGSoutput$median$pCO2)
 
 # Run timeseries inversion ----
 ## Age vector
@@ -55,14 +54,7 @@ stepsize = 0.1
 ages = seq(25 - stepsize / 2, 5 - stepsize / 2, by = -stepsize)
 
 ## Parse
-pd.p.l = parseFranks(pd.p)
-
-## Re-populate age index
-for(i in seq_along(pd.p$age_mean)){
-  pd.p$ai[i] = which.min(abs(pd.p$age_mean[i] - ages))
-}
-
-pd.p.l$level = pd.p$ai
+pd.p.l = parseFranks(pd.p, ages)
 
 ## Re-populate d13Ca
 pd.p.l$d13Ca.obs = data.frame("d13Ca" = numeric(length(ages)), 

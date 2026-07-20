@@ -233,7 +233,7 @@ tsdens = function(d, col = "black"){
 }
 
 # Make probability envelope plot
-tsplot = function(a, d, v, col = "black", ylim = NA, add = FALSE){
+tsplot = function(a, d, v, col = "black", ylab = v, ylim = NA, add = FALSE){
   if(!inherits(d, "rjags")){
     stop("d must be rjags object")
   }
@@ -258,7 +258,7 @@ tsplot = function(a, d, v, col = "black", ylim = NA, add = FALSE){
     
     xlim = range(d[, 1])
     plot(0, 0, type = "n", xlim = rev(xlim), ylim = ylim, xlab = "Age (Mya)",
-         ylab = v)
+         ylab = ylab)
   }
   
   tsdens(d, col)
@@ -542,4 +542,53 @@ parseAtmos = function(d, ages){
   }
   
   return(list("d13Ca.obs" = d13Ca.obs))
+}
+
+loadTS = function(ages){
+  library(openxlsx)
+  
+  # Initialize data.pass
+  data.pass = list("dt" = stepsize)
+  data.pass$n.steps = length(ages)
+  
+  # Add atmospheric data
+  d13Ca = read.csv("data/d13Ca_Cenozoic.csv")
+  d13Ca$sd = (d13Ca$d13Ca_97p5 - d13Ca$d13Ca_2p5) / 2
+  
+  data.pass = append(data.pass, parseAtmos(d13Ca, ages))
+  
+  # Alkenones
+  # Load proxy data for reconstruction from intermediate workbook
+  prox.raw <- read.xlsx("data/proxyData/phyto_Intermediate_combined.xlsx", 
+                        sheet = "data4PSM", startRow = 4, 
+                        na.strings = c("", "NA", "#N/A"))
+  names(prox.raw) <- trimws(names(prox.raw))
+  
+  data.pass = append(data.pass, parsePhyto(prox.raw, ages))
+  
+  # Soils
+  pf = list.files("data/proxyData/", full.names = TRUE)
+  pf.s = pf[grep("paleosol", pf)]
+  pd.s = read.xlsx(pf.s[1], 1, startRow = 4)
+  
+  data.pass = append(data.pass, parseSoil(pd.s, ages))
+  
+  # Plants
+  pf = list.files("data/proxyData/", full.names = TRUE)
+  pf.p = pf[grep("stomata", pf)]
+  
+  ## First file
+  pd.p = read.xlsx(pf.p[1], 1, startRow = 4)
+  
+  ## Others
+  if(length(pf.p) > 1){
+    for(i in pf.p[2:length(pf.p)]){
+      pd.p.a = read.xlsx(i, 1, startRow = 4)
+      pd.p = rbind(pd.p, pd.p.a)
+    }
+  }
+  
+  data.pass = append(data.pass, parseFranks(pd.p, ages))
+  
+  return(data.pass)
 }

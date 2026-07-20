@@ -11,53 +11,53 @@ model {
     d13Cp[i, 1] ~ dnorm(d13C_m[i], 1 / d13Cp[i, 2] ^ 2)
     Dab[i, 1] ~ dnorm(D.ab[i], 1 / Dab[i, 2] ^ 2)
     GCLab[i, 1] ~ dnorm(Pl.ab[i] / s1_m[i], 1 / GCLab[i, 2] ^ 2)
-    GCWab[i, 1] ~ dnorm(l.ab[i] / s2_m[genus[i]], 1 / GCWab[i, 2] ^ 2)
+    GCWab[i, 1] ~ dnorm(l.ab[i] / s2_m[gi[i]], 1 / GCWab[i, 2] ^ 2)
     Dad[i, 1] ~ dnorm(D.ad[i], 1 / Dad[i, 2] ^ 2)
     GCLad[i, 1] ~ dnorm(Pl.ad[i] / s1_m[i], 1 / GCLad[i, 2] ^ 2)
-    GCWad[i, 1] ~ dnorm(l.ad[i] / s2_m[genus[i]], 1 / GCWad[i, 2] ^ 2)
+    GCWad[i, 1] ~ dnorm(l.ad[i] / s2_m[gi[i]], 1 / GCWad[i, 2] ^ 2)
     
     ## Pl to obs scaling
     s1_m[i] ~ dgamma(s1[i, 1] * s1.beta[i], s1.beta[i])
     s1.beta[i] = s1[i, 1] / s1[i, 2] ^ 2
     
     # Franks model
-    d13C_m[i] = d13Ca[level[i]] - D13C[i]
-    D13C[i] = a + (b - a) * ci[i] / pCO2[level[i]]
-    ci[i] = pCO2[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
+    d13C_m[i] = d13Ca[ai.plant[i]] - D13C[i]
+    D13C[i] = a + (b - a) * ci[i] / pCO2[ai.plant[i]]
+    ci[i] = pCO2[ai.plant[i]] - A[i] / gcop[i] - 1 / meso.scale[gi[i]]
     
     ## Based on data I've seen A should have noise added
     A[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
     
-    q.a[i] = 1 / gcop[i] * (Ci0_m[genus[i]] - gamma)
-    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + pCO2[level[i]] - 
-                              1 / meso.scale[genus[i]] - 
-                           2 * Ci0_m[genus[i]] + 2 * gamma) + 
-      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - pCO2[level[i]] + 
-                             1 / meso.scale[genus[i]])
-    q.c[i] = A0_m[genus[i]] * (gamma * (2 * pCO2[level[i]] - 
-                                                     2 / meso.scale[genus[i]] - 
-                                               Ci0_m[genus[i]] - 2 * gamma) +
-                                   Ci0_m[genus[i]] * 
-                                     (pCO2[level[i]] - 1 / meso.scale[genus[i]]))
+    q.a[i] = 1 / gcop[i] * (Ci0_m[gi[i]] - gamma)
+    q.b[i] = gamma * (-2 * A0_m[gi[i]] / gcop[i] + pCO2[ai.plant[i]] - 
+                              1 / meso.scale[gi[i]] - 
+                           2 * Ci0_m[gi[i]] + 2 * gamma) + 
+      Ci0_m[gi[i]] * (-A0_m[gi[i]] / gcop[i] - pCO2[ai.plant[i]] + 
+                             1 / meso.scale[gi[i]])
+    q.c[i] = A0_m[gi[i]] * (gamma * (2 * pCO2[ai.plant[i]] - 
+                                                     2 / meso.scale[gi[i]] - 
+                                               Ci0_m[gi[i]] - 2 * gamma) +
+                                   Ci0_m[gi[i]] * 
+                                     (pCO2[ai.plant[i]] - 1 / meso.scale[gi[i]]))
     
     # Stomatal conductance ----
-    # Individual level
-    gcop[i] = (1 / gcop.g.ab[i] + 1 / gb_m[genus[i]]) ^ -1 + 
-      (1 / gcop.g.ad[i] + 1 / gb_m[genus[i]]) ^ -1
+    # Individual ai.plant
+    gcop[i] = (1 / gcop.g.ab[i] + 1 / gb_m[gi[i]]) ^ -1 + 
+      (1 / gcop.g.ad[i] + 1 / gb_m[gi[i]]) ^ -1
     
-    gcop.g.ab[i] = gcmax.ab[i] * gc.scale[genus[i]]
-    gcop.g.ad[i] = gcmax.ad[i] * gc.scale[genus[i]]
+    gcop.g.ab[i] = gcmax.ab[i] * gc.scale[gi[i]]
+    gcop.g.ad[i] = gcmax.ad[i] * gc.scale[gi[i]]
     
     gcmax.ab[i] = (d.v * D.ab[i] * amax.ab[i]) / 
       (l.ab[i] + ((pi / 2) * sqrt(amax.ab[i] / pi))) / 1.6
     gcmax.ad[i] = (d.v * D.ad[i] * amax.ad[i]) / 
       (l.ad[i] + ((pi / 2) * sqrt(amax.ad[i] / pi))) / 1.6
     
-    amax.ab[i] = SA.ab[i] * amax.scale[genus[i]] / D.ab[i] 
-    amax.ad[i] = SA.ad[i] * amax.scale[genus[i]] / D.ad[i] 
+    amax.ab[i] = SA.ab[i] * amax.scale[gi[i]] / D.ab[i] 
+    amax.ad[i] = SA.ad[i] * amax.scale[gi[i]] / D.ad[i] 
     
     # Stomatal geometry calculations ----
-    # Individual level
+    # Individual ai.plant
     ## Stomatal density
     D.ab[i] = SA.ab[i] / (pi * (Pl.ab[i] / 2) ^ 2)
     D.ad[i] = SA.ad[i] / (pi * (Pl.ad[i] / 2) ^ 2)
@@ -87,41 +87,42 @@ model {
     d13Cp[i, 1] ~ dnorm(d13C_m[i], 1 / d13Cp[i, 2] ^ 2)
     Dab[i, 1] ~ dnorm(D[i], 1 / Dab[i, 2] ^ 2)
     GCLab[i, 1] ~ dnorm(Pl[i] / s1_m[i], 1 / GCLab[i, 2] ^ 2)
-    GCWab[i, 1] ~ dnorm(l[i] / s2_m[genus[i]], 1 / GCWab[i, 2] ^ 2)
+    GCWab[i, 1] ~ dnorm(l[i] / s2_m[gi[i]], 1 / GCWab[i, 2] ^ 2)
 
     ## Pl to obs scaling
     s1_m[i] ~ dgamma(s1[i, 1] * s1.beta[i], s1.beta[i])
     s1.beta[i] = s1[i, 1] / s1[i, 2] ^ 2
     
     # Franks model
-    d13C_m[i] = d13Ca[level[i]] - D13C[i]
-    D13C[i] = a + (b - a) * ci[i] / pCO2[level[i]]
-    ci[i] = pCO2[level[i]] - A[i] / gcop[i] - 1 / meso.scale[genus[i]]
+    d13C_m[i] = d13Ca[ai.plant[i]] - D13C[i]
+    D13C[i] = a + (b - a) * ci[i] / pCO2[ai.plant[i]]
+    ci[i] = pCO2[ai.plant[i]] - A[i] / gcop[i] - 1 / meso.scale[gi[i]]
     
     ## Based on data I've seen A should have noise added
-    A[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
+    A[i] ~ dgamma(A.1[i] ^ 2 / 0.25, A.1[i] / 0.25)
+    A.1[i] = (-q.b[i] - sqrt(q.b[i] ^ 2 - 4 * q.a[i] * q.c[i])) / (2 * q.a[i])
     
-    q.a[i] = 1 / gcop[i] * (Ci0_m[genus[i]] - gamma)
-    q.b[i] = gamma * (-2 * A0_m[genus[i]] / gcop[i] + pCO2[level[i]] - 
-                              1 / meso.scale[genus[i]] - 
-                              2 * Ci0_m[genus[i]] + 2 * gamma) + 
-      Ci0_m[genus[i]] * (-A0_m[genus[i]] / gcop[i] - pCO2[level[i]] + 
-                             1 / meso.scale[genus[i]])
-    q.c[i] = A0_m[genus[i]] * (gamma * (2 * pCO2[level[i]] - 
-                                                     2 / meso.scale[genus[i]] - 
-                                                     Ci0_m[genus[i]] - 2 * gamma) +
-                                      Ci0_m[genus[i]] * 
-                                      (pCO2[level[i]] - 1 / meso.scale[genus[i]]))
+    q.a[i] = 1 / gcop[i] * (Ci0_m[gi[i]] - gamma)
+    q.b[i] = gamma * (-2 * A0_m[gi[i]] / gcop[i] + pCO2[ai.plant[i]] - 
+                              1 / meso.scale[gi[i]] - 
+                              2 * Ci0_m[gi[i]] + 2 * gamma) + 
+      Ci0_m[gi[i]] * (-A0_m[gi[i]] / gcop[i] - pCO2[ai.plant[i]] + 
+                             1 / meso.scale[gi[i]])
+    q.c[i] = A0_m[gi[i]] * (gamma * (2 * pCO2[ai.plant[i]] - 
+                                                     2 / meso.scale[gi[i]] - 
+                                                     Ci0_m[gi[i]] - 2 * gamma) +
+                                      Ci0_m[gi[i]] * 
+                                      (pCO2[ai.plant[i]] - 1 / meso.scale[gi[i]]))
     
     # Stomatal conductance ----
-    # Individual level
-    gcop[i] = (1 / gcop.g[i] + 1 / gb_m[genus[i]]) ^ -1
-    gcop.g[i] = gcmax[i] * gc.scale[genus[i]]
+    # Individual ai.plant
+    gcop[i] = (1 / gcop.g[i] + 1 / gb_m[gi[i]]) ^ -1
+    gcop.g[i] = gcmax[i] * gc.scale[gi[i]]
     gcmax[i] = (d.v * D[i] * amax[i]) / (l[i] + ((pi / 2) * sqrt(amax[i] / pi))) / 1.6
-    amax[i] = SA[i] * amax.scale[genus[i]] / D[i] 
+    amax[i] = SA[i] * amax.scale[gi[i]] / D[i] 
     
     # Stomatal geometry calculations ----
-    # Individual level
+    # Individual ai.plant
     ## Stomatal density
     D[i] = SA[i] / (pi * (Pl[i] / 2) ^ 2)
     
@@ -138,7 +139,7 @@ model {
   }
   
   # Taxon priors ----
-  for(i in 1:length(gb[, 1])){
+  for(i in 1:n.gen){
     s2_m[i] ~ dgamma(s2[i, 1] * s2.beta[i], s2.beta[i])
     s2.beta[i] = s2[i, 1] / s2[i, 2] ^ 2
     
