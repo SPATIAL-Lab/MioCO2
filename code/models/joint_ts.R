@@ -1,7 +1,7 @@
 model {
   
   # Likelihoods ----
-  ## Alkanones
+  ## Alkenones
   for(i in 1:n.obs.alk){
     d13C.obs.alk[i, 1] ~ dnorm(d13C.alk[i], 1 / d13C.obs.alk[i, 2] ^ 2)
     temp.obs.alk[i, 1] ~ dnorm(tempC.alk[si.alk[i], ai.alk[i]], 
@@ -9,7 +9,7 @@ model {
     po4.obs[i, 1] ~ dnorm(po4[si.alk[i], ai.alk[i]], 1 / po4.obs[i, 2] ^ 2)
   }
   
-  ## Coco liths
+  ## Cocoliths
   for(i in 1:n.lith){
     lith.obs[i, 1] ~ dnorm(len.lith[li[i]], 1 / lith.obs[i, 2] ^ 2)
   }
@@ -47,7 +47,7 @@ model {
   }
   
   # PSMs ----
-  ## Alkanones
+  ## Alkenones
   for(i in 1:n.obs.alk){
     temp.alk[i] = tempC.alk[si.alk[i], ai.alk[i]] + 273.15
     
